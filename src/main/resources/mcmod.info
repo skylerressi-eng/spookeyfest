@@ -1,0 +1,13 @@
+[
+  {
+    "modid": "spookybirch",
+    "name": "SpookyBirch",
+    "description": "A Birch-style overlay for the Hypixel SkyBlock Spooky Festival. Shows mana, candy tracking, nearby spooky mobs, best candy mobs, and spooky fishing sea creatures.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "https://github.com/skylerressi-eng/spookeyfest",
+    "authorList": ["skylerressi"],
+    "credits": "Community candy/fishing data. Not affiliated with Hypixel.",
+    "logoFile": ""
+  }
+]
