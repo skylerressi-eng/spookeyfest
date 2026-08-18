@@ -24,6 +24,13 @@ public final class CandyTracker {
     /** How long the "recent rate" window looks back, in ms. */
     private static final long WINDOW_MS = 5 * 60 * 1000L;
 
+    /**
+     * The recent window must span at least this long before it counts toward the
+     * best-rate high score. Without this, grabbing one stack in the first couple
+     * of seconds would report an absurd rate (e.g. 180k/hr) as your "best".
+     */
+    private static final long MIN_BEST_SPAN_MS = 60 * 1000L;
+
     // Collected totals this session (monotonic — only ever go up).
     private int collectedGreen = 0;
     private int collectedPurple = 0;
@@ -58,8 +65,17 @@ public final class CandyTracker {
         if (gained) lastGainMs = now;
 
         pushSample(now);
-        double rr = recentRatePerHour();
-        if (rr > bestRecentRate) bestRecentRate = rr;
+        // Only let a stable, long-enough window set the best-rate high score.
+        if (windowSpanMs() >= MIN_BEST_SPAN_MS) {
+            double rr = recentRatePerHour();
+            if (rr > bestRecentRate) bestRecentRate = rr;
+        }
+    }
+
+    /** Time span currently covered by the recent-rate window, in ms. */
+    private long windowSpanMs() {
+        if (samples.size() < 2) return 0L;
+        return samples.peekLast()[0] - samples.peekFirst()[0];
     }
 
     private void setLast(int green, int purple) {

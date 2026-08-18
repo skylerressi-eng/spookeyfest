@@ -22,6 +22,11 @@ public class GuideScreen extends GuiScreen {
     private int tab = 0; // 0 = stats, 1 = candy, 2 = fishing
 
     @Override
+    public boolean doesGuiPauseGame() {
+        return false; // keep the live "My Score" tab ticking in singleplayer
+    }
+
+    @Override
     public void initGui() {
         buttonList.clear();
         buttonList.add(new GuiButton(0, width / 2 - 152, 24, 98, 20, "My Score"));

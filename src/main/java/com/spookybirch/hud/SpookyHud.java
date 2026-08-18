@@ -9,6 +9,7 @@ import com.spookybirch.util.Fmt;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiChat;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
@@ -43,20 +44,34 @@ public class SpookyHud extends Gui {
 
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null) return;
-        if (mc.currentScreen != null) return; // hide behind menus
+        // Hide behind full menus (inventory, etc.) but stay visible while the
+        // chat box is open — a HUD that vanishes when you type is annoying.
+        if (mc.currentScreen != null && !(mc.currentScreen instanceof GuiChat)) return;
 
         List<Line> lines = build(cfg, st);
         if (lines.isEmpty()) return;
-
-        GlStateManager.pushMatrix();
-        GlStateManager.translate(cfg.hudX, cfg.hudY, 0);
-        GlStateManager.scale(cfg.hudScale, cfg.hudScale, 1f);
 
         int pad = 4;
         int width = 0;
         for (Line l : lines) width = Math.max(width, mc.fontRendererObj.getStringWidth(l.text));
         int lineH = mc.fontRendererObj.FONT_HEIGHT + 2;
         int height = lines.size() * lineH;
+
+        // Clamp so the panel stays fully on-screen even after a resolution
+        // change. The text anchor is (hudX, hudY) — same as the move editor —
+        // and the translucent panel extends `pad` up/left of it, so the clamp
+        // range accounts for that padding on both sides.
+        ScaledResolution sr = new ScaledResolution(mc);
+        float scale = cfg.hudScale;
+        int panelW = (int) ((width + pad * 2) * scale);
+        int panelH = (int) ((height + pad * 2) * scale);
+        int padPx = (int) (pad * scale);
+        int drawX = clamp(cfg.hudX, padPx, Math.max(padPx, sr.getScaledWidth() - panelW + padPx));
+        int drawY = clamp(cfg.hudY, padPx, Math.max(padPx, sr.getScaledHeight() - panelH + padPx));
+
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(drawX, drawY, 0);
+        GlStateManager.scale(scale, scale, 1f);
 
         drawRect(-pad, -pad, width + pad, height + pad, BG);
 
@@ -67,6 +82,12 @@ public class SpookyHud extends Gui {
         }
 
         GlStateManager.popMatrix();
+        // Leave GL color/state clean for whatever renders next.
+        GlStateManager.color(1f, 1f, 1f, 1f);
+    }
+
+    private static int clamp(int v, int lo, int hi) {
+        return v < lo ? lo : (v > hi ? hi : v);
     }
 
     /** The rendered version of the panel — used for a live preview in the move GUI too. */
@@ -99,9 +120,10 @@ public class SpookyHud extends Gui {
         if (cfg.showScore) {
             CandyTracker t = CandyTracker.INSTANCE;
             lines.add(new Line("Score: " + Fmt.num(t.score()) + "  " + Fmt.rate(t.recentRatePerHour()), TITLE));
-            // Nudge the player if candy has stopped coming in.
+            // Nudge the player if candy has stopped coming in — but only during
+            // the fest, so it doesn't nag while you're just standing around.
             long idle = t.secondsSinceGain();
-            if (idle >= 30) {
+            if (st.festivalActive && idle >= 30) {
                 lines.add(new Line("Idle " + Fmt.duration(idle) + " — move spots?", RED));
             }
         }
@@ -147,11 +169,5 @@ public class SpookyHud extends Gui {
                 (int) ((width + pad * 2) * scale),
                 (int) ((height + pad * 2) * scale)
         };
-    }
-
-    // Keep ScaledResolution import meaningful for downstream tooling / future use.
-    @SuppressWarnings("unused")
-    private static ScaledResolution res(Minecraft mc) {
-        return new ScaledResolution(mc);
     }
 }

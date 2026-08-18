@@ -29,6 +29,9 @@ public class StateUpdater {
     // "1234/1234✎" or "1,234/1,234✎ Mana" in the action bar.
     private static final Pattern MANA = Pattern.compile("([0-9,]+)/([0-9,]+)\\u270E");
 
+    // A mm:ss (or h:mm:ss) countdown anywhere on the scoreboard.
+    private static final Pattern TIMER = Pattern.compile("(\\d{1,2}:\\d{2}(?::\\d{2})?)");
+
     // Names that count as "spooky" mobs for the nearby counter.
     private static final Set<String> SPOOKY_NAMES = new HashSet<String>(Arrays.asList(
             "wither gourd", "scary jerry", "batty witch", "phantom spirit",
@@ -74,17 +77,25 @@ public class StateUpdater {
         List<String> lines = ScoreboardReader.lines();
         boolean active = false;
         String timeLeft = "";
+        String fallbackTime = "";
         for (String line : lines) {
             String low = line.toLowerCase();
-            if (low.contains("spooky festival")) {
-                active = true;
-                // Try to grab a trailing timer like "12:34".
-                Matcher t = Pattern.compile("(\\d{1,2}:\\d{2})").matcher(line);
-                if (t.find()) timeLeft = t.group(1);
+            if (low.contains("spooky festival")) active = true;
+
+            // The countdown usually sits on its own line ("Ends In: 12:34").
+            Matcher t = TIMER.matcher(line);
+            if (t.find()) {
+                String found = t.group(1);
+                if (low.contains("end") || low.contains("left") || low.contains("time")
+                        || low.contains("spooky")) {
+                    timeLeft = found;          // a labelled timer wins
+                } else if (fallbackTime.isEmpty()) {
+                    fallbackTime = found;      // otherwise remember the first one seen
+                }
             }
         }
         s.festivalActive = active;
-        s.festivalTimeLeft = timeLeft;
+        s.festivalTimeLeft = active ? (!timeLeft.isEmpty() ? timeLeft : fallbackTime) : "";
     }
 
     private void readCandy(EntityPlayer player) {
@@ -103,7 +114,11 @@ public class StateUpdater {
         if (s.purpleBaseline < 0) s.purpleBaseline = purple;
 
         // Feed the score tracker (counts only positive gains -> rate/score/ETA).
-        com.spookybirch.core.CandyTracker.INSTANCE.update(green, purple);
+        // Only while in SkyBlock, so lobby/limbo time never dilutes the session
+        // timer or rates.
+        if (s.inSkyblock) {
+            com.spookybirch.core.CandyTracker.INSTANCE.update(green, purple);
+        }
     }
 
     private void countNearbyMobs(Minecraft mc) {
