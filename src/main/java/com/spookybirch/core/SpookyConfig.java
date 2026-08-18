@@ -56,6 +56,13 @@ public final class SpookyConfig {
         hudY     = cfg.getInt("hudY", "position", 5, 0, 10000, "HUD y pixel");
         hudScale = (float) cfg.get("position", "hudScale", 1.0D, "HUD scale", 0.5D, 2.5D).getDouble();
         if (cfg.hasChanged()) cfg.save();
+        applyToTracker();
+    }
+
+    /** Push score-affecting settings into the (Forge-free) tracker. */
+    public void applyToTracker() {
+        CandyTracker.INSTANCE.setPurpleWeight(purpleWeight);
+        CandyTracker.INSTANCE.setGoal(candyGoal);
     }
 
     public void save() {
@@ -71,6 +78,7 @@ public final class SpookyConfig {
         cfg.get("hud", "onlyDuringFestival", false).set(onlyDuringFestival);
         cfg.get("score", "purpleWeight", 8.0D).set(purpleWeight);
         cfg.get("score", "candyGoal", 0).set(candyGoal);
+        applyToTracker();
         cfg.get("position", "hudX", 5).set(hudX);
         cfg.get("position", "hudY", 5).set(hudY);
         cfg.get("position", "hudScale", 1.0D).set((double) hudScale);

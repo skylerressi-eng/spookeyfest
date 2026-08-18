@@ -2,6 +2,7 @@ package com.spookybirch.core;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.function.LongSupplier;
 
 /**
  * The candy score tracker.
@@ -11,11 +12,15 @@ import java.util.Deque;
  * candy that stacks then splits, never makes the counters go backwards.
  *
  * From that it derives:
- *   - a weighted CANDY SCORE (purple counts as {@link SpookyConfig#purpleWeight}),
+ *   - a weighted CANDY SCORE (purple counts as {@link #purpleWeight}),
  *   - an overall rate (score per hour over the whole session),
  *   - a live recent rate (score per hour over the last few minutes),
  *   - a best-recent-rate high score,
- *   - an ETA to a configurable candy-score goal.
+ *   - an ETA to a candy-score goal.
+ *
+ * This class has NO Minecraft/Forge dependency on purpose: SpookyConfig pushes
+ * the weight and goal into it, and the clock is injectable — so the whole thing
+ * can be unit- and stress-tested with plain Java.
  */
 public final class CandyTracker {
 
@@ -30,6 +35,16 @@ public final class CandyTracker {
      * of seconds would report an absurd rate (e.g. 180k/hr) as your "best".
      */
     private static final long MIN_BEST_SPAN_MS = 60 * 1000L;
+
+    /** Hard cap on stored samples — belt-and-braces against unbounded growth. */
+    private static final int MAX_SAMPLES = 20_000;
+
+    // Tunables, pushed in from config (kept local so this class stays pure).
+    private double purpleWeight = 8.0;
+    private int goal = 0;
+
+    // Injectable clock (defaults to wall time; overridden in tests).
+    private LongSupplier clock = System::currentTimeMillis;
 
     // Collected totals this session (monotonic — only ever go up).
     private int collectedGreen = 0;
@@ -49,7 +64,11 @@ public final class CandyTracker {
 
     /** Feed the tracker the current inventory candy totals. */
     public void update(int green, int purple) {
-        long now = System.currentTimeMillis();
+        // Defend against nonsense inputs.
+        if (green < 0) green = 0;
+        if (purple < 0) purple = 0;
+
+        long now = clock.getAsLong();
         if (!started) {
             started = true;
             sessionStartMs = now;
@@ -57,6 +76,10 @@ public final class CandyTracker {
             pushSample(now);
             return;
         }
+        // Ignore a clock that appears to run backwards (shouldn't happen, but a
+        // negative dt would corrupt every rate).
+        if (now < sessionStartMs) now = sessionStartMs;
+
         boolean gained = false;
         if (lastGreen >= 0 && green > lastGreen) { collectedGreen += green - lastGreen; gained = true; }
         if (lastPurple >= 0 && purple > lastPurple) { collectedPurple += purple - lastPurple; gained = true; }
@@ -89,11 +112,16 @@ public final class CandyTracker {
         while (!samples.isEmpty() && now - samples.peekFirst()[0] > WINDOW_MS) {
             samples.pollFirst();
         }
+        // Safety valve: if updates ever come faster than expected, never let the
+        // window grow without bound.
+        while (samples.size() > MAX_SAMPLES) {
+            samples.pollFirst();
+        }
     }
 
     /** Weighted candy score: green + purple × purpleWeight. */
     public double score() {
-        return collectedGreen + collectedPurple * SpookyConfig.INSTANCE.purpleWeight;
+        return collectedGreen + collectedPurple * purpleWeight;
     }
 
     public int collectedGreen()  { return collectedGreen; }
@@ -101,7 +129,8 @@ public final class CandyTracker {
 
     public long elapsedMs() {
         if (!started) return 0L;
-        return System.currentTimeMillis() - sessionStartMs;
+        long ms = clock.getAsLong() - sessionStartMs;
+        return ms < 0L ? 0L : ms;
     }
 
     /** Whole-session score per hour. */
@@ -127,15 +156,15 @@ public final class CandyTracker {
     /** Seconds since the last candy gain — used to show an "idle" hint. */
     public long secondsSinceGain() {
         if (lastGainMs == 0L) return -1L;
-        return (System.currentTimeMillis() - lastGainMs) / 1000L;
+        long s = (clock.getAsLong() - lastGainMs) / 1000L;
+        return s < 0L ? 0L : s;
     }
 
     /**
-     * ETA in seconds to reach the configured candy-score goal at the recent
-     * rate, or -1 if we can't estimate (no goal, already hit, or no rate yet).
+     * ETA in seconds to reach the candy-score goal at the recent rate, or -1 if
+     * we can't estimate (no goal, or no rate yet). Returns 0 when already hit.
      */
     public long etaSecondsToGoal() {
-        int goal = SpookyConfig.INSTANCE.candyGoal;
         if (goal <= 0) return -1L;
         double remaining = goal - score();
         if (remaining <= 0) return 0L;
@@ -147,7 +176,7 @@ public final class CandyTracker {
     public void reset() {
         collectedGreen = 0;
         collectedPurple = 0;
-        sessionStartMs = System.currentTimeMillis();
+        sessionStartMs = clock.getAsLong();
         lastGainMs = 0L;
         bestRecentRate = 0.0;
         samples.clear();
@@ -156,6 +185,37 @@ public final class CandyTracker {
         // inventory as a fresh gain.
         started = true;
     }
+
+    // --- config plumbing (SpookyConfig pushes these in) ---
+
+    public void setPurpleWeight(double w) {
+        this.purpleWeight = w > 0 ? w : 1.0;
+    }
+
+    public void setGoal(int g) {
+        this.goal = g < 0 ? 0 : g;
+    }
+
+    public double purpleWeight() { return purpleWeight; }
+    public int goal() { return goal; }
+
+    // --- test seam: swap the clock and start from a clean slate ---
+
+    /** Package-visible so the stress-test harness can drive a fake clock. */
+    void setClockForTest(LongSupplier c) {
+        this.clock = c;
+        this.collectedGreen = 0;
+        this.collectedPurple = 0;
+        this.lastGreen = -1;
+        this.lastPurple = -1;
+        this.sessionStartMs = 0L;
+        this.lastGainMs = 0L;
+        this.bestRecentRate = 0.0;
+        this.started = false;
+        this.samples.clear();
+    }
+
+    int sampleCount() { return samples.size(); }
 
     private CandyTracker() {}
 }

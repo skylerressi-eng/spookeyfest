@@ -53,6 +53,7 @@ Reset a session with **`/spooky reset`**.
 | `/spooky` | Show help |
 | `/spooky guide` | Open the score + candy + fishing GUI (3 tabs) |
 | `/spooky stats` | Print your candy score, rate & ETA to chat |
+| _(tab-complete)_ | Press Tab after `/spooky ` to cycle sub-commands |
 | `/spooky goal <n>` | Set a candy-score goal for the ETA (`0` turns it off) |
 | `/spooky candy` | Print the best-candy-mob ranking to chat |
 | `/spooky fishing` | Print the spooky sea-creature table to chat |
@@ -112,6 +113,28 @@ The finished mod jar lands in `build/libs/`. Drop it into your
 > The repo ships the Gradle *wrapper config* but not the wrapper binary. If you
 > don't have Gradle installed, run `gradle wrapper --gradle-version 4.10.3`
 > once to generate `gradlew`, then use `./gradlew` instead.
+
+## Tests
+
+The score-tracking engine, number/time formatting and text parsing have **no
+Minecraft dependency**, so they're covered by a plain-Java stress test you can
+run without Forge:
+
+```bash
+./scripts/run-tests.sh
+```
+
+It runs ~40 checks including a **500,000-event** simulation (~27 hours of play)
+that verifies: candy is only ever added on gains (selling never rolls it back),
+the score weighting, session/recent/best rates, the best-rate spike guard, ETA
+math, reset behaviour, and that the rate window stays memory-bounded. All green:
+
+```
+PASSED: 42   FAILED: 0
+```
+
+`CandyTracker` is deliberately decoupled from Forge (config values are pushed in,
+and its clock is injectable) which is what makes this testable.
 
 ## Tuning the data
 

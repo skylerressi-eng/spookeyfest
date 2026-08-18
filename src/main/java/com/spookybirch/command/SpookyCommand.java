@@ -14,6 +14,7 @@ import com.spookybirch.gui.MoveHudScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommandSender;
+import net.minecraft.util.BlockPos;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 
@@ -23,7 +24,9 @@ import java.util.List;
 /**
  * /spooky command. Client-side only (registered via ClientCommandHandler).
  *   /spooky            help
- *   /spooky guide      open the candy + fishing guide GUI
+ *   /spooky guide      open the score + candy + fishing guide GUI
+ *   /spooky stats      print candy score / rate / ETA to chat
+ *   /spooky goal <n>   set a candy-score goal for the ETA (0 = off)
  *   /spooky candy      print the candy ranking to chat
  *   /spooky fishing    print the fishing table to chat
  *   /spooky move       open the drag-to-move HUD editor
@@ -32,9 +35,22 @@ import java.util.List;
  */
 public class SpookyCommand extends CommandBase {
 
+    private static final String[] SUBS = {
+            "guide", "stats", "goal", "candy", "fishing", "move", "toggle", "reset"
+    };
+
     @Override
     public String getCommandName() {
         return "spooky";
+    }
+
+    /** Tab-complete the sub-command names after "/spooky ". */
+    @Override
+    public List<String> addTabCompletionOptions(ICommandSender sender, String[] args, BlockPos pos) {
+        if (args.length == 1) {
+            return getListOfStringsMatchingLastWord(args, SUBS);
+        }
+        return null;
     }
 
     @Override
@@ -44,7 +60,7 @@ public class SpookyCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/spooky <guide|candy|fishing|move|toggle|reset>";
+        return "/spooky <guide|stats|goal|candy|fishing|move|toggle|reset>";
     }
 
     @Override
