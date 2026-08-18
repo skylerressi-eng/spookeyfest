@@ -101,6 +101,9 @@ public class StateUpdater {
         s.purpleCandy = purple;
         if (s.greenBaseline < 0) s.greenBaseline = green;
         if (s.purpleBaseline < 0) s.purpleBaseline = purple;
+
+        // Feed the score tracker (counts only positive gains -> rate/score/ETA).
+        com.spookybirch.core.CandyTracker.INSTANCE.update(green, purple);
     }
 
     private void countNearbyMobs(Minecraft mc) {

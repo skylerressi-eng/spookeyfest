@@ -1,9 +1,11 @@
 package com.spookybirch.hud;
 
+import com.spookybirch.core.CandyTracker;
 import com.spookybirch.core.SpookyConfig;
 import com.spookybirch.core.SpookyState;
 import com.spookybirch.data.CandyData;
 import com.spookybirch.data.CandyMob;
+import com.spookybirch.util.Fmt;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
@@ -92,6 +94,25 @@ public class SpookyHud extends Gui {
         if (cfg.showCandy) {
             lines.add(new Line("Green: " + st.greenCandy + "  (+" + st.greenGained() + ")", GREEN));
             lines.add(new Line("Purple: " + st.purpleCandy + "  (+" + st.purpleGained() + ")", PURPLE));
+        }
+
+        if (cfg.showScore) {
+            CandyTracker t = CandyTracker.INSTANCE;
+            lines.add(new Line("Score: " + Fmt.num(t.score()) + "  " + Fmt.rate(t.recentRatePerHour()), TITLE));
+            // Nudge the player if candy has stopped coming in.
+            long idle = t.secondsSinceGain();
+            if (idle >= 30) {
+                lines.add(new Line("Idle " + Fmt.duration(idle) + " — move spots?", RED));
+            }
+        }
+
+        if (cfg.showEta) {
+            long eta = CandyTracker.INSTANCE.etaSecondsToGoal();
+            if (eta == 0L) {
+                lines.add(new Line("Goal reached! ✔", GREEN));
+            } else if (eta > 0L) {
+                lines.add(new Line("Goal in " + Fmt.duration(eta), CYAN));
+            }
         }
 
         if (cfg.showNearbyMobs) {

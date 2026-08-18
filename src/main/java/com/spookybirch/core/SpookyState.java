@@ -28,17 +28,20 @@ public final class SpookyState {
     // --- Nearby spooky mobs (counted from loaded entities) ---
     public int nearbySpookyMobs = 0;
 
+    // Session gains come from the tracker, which counts only positive changes,
+    // so trading candy away no longer makes these go negative.
     public int greenGained() {
-        return greenBaseline < 0 ? 0 : Math.max(0, greenCandy - greenBaseline);
+        return CandyTracker.INSTANCE.collectedGreen();
     }
 
     public int purpleGained() {
-        return purpleBaseline < 0 ? 0 : Math.max(0, purpleCandy - purpleBaseline);
+        return CandyTracker.INSTANCE.collectedPurple();
     }
 
     public void resetSession() {
         greenBaseline = greenCandy;
         purpleBaseline = purpleCandy;
+        CandyTracker.INSTANCE.reset();
     }
 
     private SpookyState() {}

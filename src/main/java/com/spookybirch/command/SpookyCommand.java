@@ -1,7 +1,9 @@
 package com.spookybirch.command;
 
+import com.spookybirch.core.CandyTracker;
 import com.spookybirch.core.SpookyConfig;
 import com.spookybirch.core.SpookyState;
+import com.spookybirch.util.Fmt;
 import com.spookybirch.data.CandyData;
 import com.spookybirch.data.CandyMob;
 import com.spookybirch.data.FishingData;
@@ -72,6 +74,10 @@ public class SpookyCommand extends CommandBase {
             printCandy(sender);
         } else if (sub.equals("fishing")) {
             printFishing(sender);
+        } else if (sub.equals("stats") || sub.equals("score")) {
+            printStats(sender);
+        } else if (sub.equals("goal")) {
+            setGoal(sender, args);
         } else if (sub.equals("toggle")) {
             SpookyConfig.INSTANCE.hudEnabled = !SpookyConfig.INSTANCE.hudEnabled;
             SpookyConfig.INSTANCE.save();
@@ -89,9 +95,46 @@ public class SpookyCommand extends CommandBase {
         msg(s, EnumChatFormatting.YELLOW + "/spooky guide " + EnumChatFormatting.GRAY + "- candy + fishing tables");
         msg(s, EnumChatFormatting.YELLOW + "/spooky candy " + EnumChatFormatting.GRAY + "- best candy mobs in chat");
         msg(s, EnumChatFormatting.YELLOW + "/spooky fishing " + EnumChatFormatting.GRAY + "- spooky sea creatures");
+        msg(s, EnumChatFormatting.YELLOW + "/spooky stats " + EnumChatFormatting.GRAY + "- candy score, rate & ETA");
+        msg(s, EnumChatFormatting.YELLOW + "/spooky goal <n> " + EnumChatFormatting.GRAY + "- set a candy-score goal (0=off)");
         msg(s, EnumChatFormatting.YELLOW + "/spooky move " + EnumChatFormatting.GRAY + "- drag the HUD around");
         msg(s, EnumChatFormatting.YELLOW + "/spooky toggle " + EnumChatFormatting.GRAY + "- show/hide the HUD");
         msg(s, EnumChatFormatting.YELLOW + "/spooky reset " + EnumChatFormatting.GRAY + "- reset session candy");
+    }
+
+    private void printStats(ICommandSender s) {
+        CandyTracker t = CandyTracker.INSTANCE;
+        SpookyConfig cfg = SpookyConfig.INSTANCE;
+        msg(s, EnumChatFormatting.GOLD + "" + EnumChatFormatting.BOLD + "☠ Candy score tracker");
+        msg(s, EnumChatFormatting.GRAY + "Collected: " + EnumChatFormatting.GREEN + t.collectedGreen() + " green"
+                + EnumChatFormatting.GRAY + ", " + EnumChatFormatting.LIGHT_PURPLE + t.collectedPurple() + " purple");
+        msg(s, EnumChatFormatting.GRAY + "Score: " + EnumChatFormatting.GOLD + Fmt.num(t.score())
+                + EnumChatFormatting.DARK_GRAY + " (purple ×" + Fmt.num(cfg.purpleWeight) + ")");
+        msg(s, EnumChatFormatting.GRAY + "Rate now: " + EnumChatFormatting.AQUA + Fmt.rate(t.recentRatePerHour())
+                + EnumChatFormatting.GRAY + "  •  session: " + EnumChatFormatting.AQUA + Fmt.rate(t.overallRatePerHour()));
+        msg(s, EnumChatFormatting.GRAY + "Best rate: " + EnumChatFormatting.AQUA + Fmt.rate(t.bestRecentRate())
+                + EnumChatFormatting.GRAY + "  •  played: " + EnumChatFormatting.WHITE + Fmt.duration(t.elapsedMs() / 1000L));
+        if (cfg.candyGoal > 0) {
+            long eta = t.etaSecondsToGoal();
+            String etaStr = eta == 0L ? "reached!" : (eta < 0L ? "need more data" : "~" + Fmt.duration(eta));
+            msg(s, EnumChatFormatting.GRAY + "Goal " + Fmt.num(cfg.candyGoal) + ": " + EnumChatFormatting.YELLOW + etaStr);
+        }
+    }
+
+    private void setGoal(ICommandSender s, String[] args) {
+        if (args.length < 2) {
+            msg(s, EnumChatFormatting.RED + "Usage: /spooky goal <score>  (0 turns it off)");
+            return;
+        }
+        try {
+            int goal = Integer.parseInt(args[1].replace(",", ""));
+            if (goal < 0) goal = 0;
+            SpookyConfig.INSTANCE.candyGoal = goal;
+            SpookyConfig.INSTANCE.save();
+            msg(s, EnumChatFormatting.GOLD + (goal == 0 ? "Candy goal cleared." : "Candy goal set to " + Fmt.num(goal) + "."));
+        } catch (NumberFormatException e) {
+            msg(s, EnumChatFormatting.RED + "That's not a number: " + args[1]);
+        }
     }
 
     private void printCandy(ICommandSender s) {

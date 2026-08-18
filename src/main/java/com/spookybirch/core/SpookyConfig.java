@@ -20,7 +20,14 @@ public final class SpookyConfig {
     public boolean showEvent = true;
     public boolean showNearbyMobs = true;
     public boolean showBestMobTip = true;
+    public boolean showScore = true;   // candy score + session rate
+    public boolean showEta = true;     // ETA to the candy goal
     public boolean onlyDuringFestival = false; // if true, hide HUD outside the fest
+
+    // Score tuning: how much one purple candy is worth in "score", and an
+    // optional session goal the tracker estimates an ETA toward (0 = no goal).
+    public double purpleWeight = 8.0;
+    public int candyGoal = 0;
 
     public int hudX = 5;
     public int hudY = 5;
@@ -40,7 +47,11 @@ public final class SpookyConfig {
         showEvent        = cfg.getBoolean("showEvent", "hud", true, "Show festival status/time");
         showNearbyMobs   = cfg.getBoolean("showNearbyMobs", "hud", true, "Show nearby spooky mob count");
         showBestMobTip   = cfg.getBoolean("showBestMobTip", "hud", true, "Show best-candy-mob tip line");
+        showScore        = cfg.getBoolean("showScore", "hud", true, "Show candy score + rate line");
+        showEta          = cfg.getBoolean("showEta", "hud", true, "Show ETA to the candy goal");
         onlyDuringFestival = cfg.getBoolean("onlyDuringFestival", "hud", false, "Only show HUD while the fest is live");
+        purpleWeight = cfg.get("score", "purpleWeight", 8.0D, "Score value of one purple candy (green = 1)", 1.0D, 100.0D).getDouble();
+        candyGoal    = cfg.getInt("candyGoal", "score", 0, 0, 10_000_000, "Candy score goal for ETA (0 = off)");
         hudX     = cfg.getInt("hudX", "position", 5, 0, 10000, "HUD x pixel");
         hudY     = cfg.getInt("hudY", "position", 5, 0, 10000, "HUD y pixel");
         hudScale = (float) cfg.get("position", "hudScale", 1.0D, "HUD scale", 0.5D, 2.5D).getDouble();
@@ -55,7 +66,11 @@ public final class SpookyConfig {
         cfg.get("hud", "showEvent", true).set(showEvent);
         cfg.get("hud", "showNearbyMobs", true).set(showNearbyMobs);
         cfg.get("hud", "showBestMobTip", true).set(showBestMobTip);
+        cfg.get("hud", "showScore", true).set(showScore);
+        cfg.get("hud", "showEta", true).set(showEta);
         cfg.get("hud", "onlyDuringFestival", false).set(onlyDuringFestival);
+        cfg.get("score", "purpleWeight", 8.0D).set(purpleWeight);
+        cfg.get("score", "candyGoal", 0).set(candyGoal);
         cfg.get("position", "hudX", 5).set(hudX);
         cfg.get("position", "hudY", 5).set(hudY);
         cfg.get("position", "hudScale", 1.0D).set((double) hudScale);

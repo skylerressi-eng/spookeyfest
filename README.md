@@ -21,20 +21,44 @@ Built as a **Forge 1.8.9** client mod — the same version SkyBlock QoL mods
 | **Mana `cur/max`** | The action bar (the `✎` mana readout) |
 | **Green candy** (total + gained this session) | Counts *Green Candy* in your inventory |
 | **Purple candy** (total + gained this session) | Counts *Purple Candy* in your inventory |
+| **Candy score + live rate** | Weighted score & candy/hr (see below) |
+| **Goal ETA** | Time left to your candy-score goal at the current rate |
 | **Spooky mobs nearby** | Counts spooky-named mobs within 30 blocks |
 | **Best candy mob tip** | Top of the candy ranking |
+
+## Candy score tracker
+
+The tracker watches your candy totals and counts **only the gains** — so
+trading candy away or selling it never drags your session numbers backwards.
+From that it works out:
+
+- **Candy score** — `green + purple × weight` (weight defaults to 8, since a
+  purple candy is worth roughly 8 green when trading). Tune with
+  `purpleWeight` in the config.
+- **Rate (recent)** — candy score per hour over the **last 5 minutes**, so it
+  reacts when you switch spots or the fest heats up.
+- **Rate (session)** — candy score per hour across the whole session.
+- **Best rate** — the highest recent rate you've hit this session.
+- **Idle warning** — if no candy comes in for 30s+, the HUD nudges you.
+- **Goal + ETA** — set a target with `/spooky goal <n>` and the HUD/stats show
+  how long until you reach it at your current rate.
+
+See it all live in **`/spooky stats`** or the **My Score** tab of `/spooky guide`.
+Reset a session with **`/spooky reset`**.
 
 ## Commands
 
 | Command | Does |
 |---------|------|
 | `/spooky` | Show help |
-| `/spooky guide` | Open the candy + fishing reference GUI |
+| `/spooky guide` | Open the score + candy + fishing GUI (3 tabs) |
+| `/spooky stats` | Print your candy score, rate & ETA to chat |
+| `/spooky goal <n>` | Set a candy-score goal for the ETA (`0` turns it off) |
 | `/spooky candy` | Print the best-candy-mob ranking to chat |
 | `/spooky fishing` | Print the spooky sea-creature table to chat |
 | `/spooky move` | Drag the HUD around, scroll to scale, Esc to save |
 | `/spooky toggle` | Show/hide the HUD |
-| `/spooky reset` | Reset the "gained this session" candy counters |
+| `/spooky reset` | Reset the session candy counters + rates |
 
 Aliases: `/spookybirch`, `/sb`. There's also a keybind (**default `G`**,
 rebindable under Controls → SpookyBirch) that opens the guide.
@@ -104,13 +128,14 @@ GUI all read from those two lists.
 ```
 com.spookybirch
 ├── SpookyBirch          main @Mod entry — registers everything
-├── core/                SpookyState (live values) + SpookyConfig (saved settings)
+├── core/                SpookyState (live values), SpookyConfig (settings),
+│                        CandyTracker (score / rate / ETA engine)
 ├── event/               StateUpdater (fills state each tick) + KeyBinds
 ├── hud/                 SpookyHud (the corner overlay)
-├── gui/                 MoveHudScreen (drag/scale) + GuideScreen (reference book)
+├── gui/                 MoveHudScreen (drag/scale) + GuideScreen (score + reference)
 ├── command/             /spooky command
 ├── data/                CandyData / FishingData reference tables
-└── util/                scoreboard + text parsing helpers
+└── util/                scoreboard, text parsing + Fmt (number/time formatting)
 ```
 
 Every feature reads from `SpookyState`, which `StateUpdater` refreshes each
