@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "treegifts",
+  "version": "${version}",
+  "name": "Tree Gifts",
+  "description": "Every tree you chop drops a Hardened Wood gift. Throw axes at it to crack it open — each hit reveals a rarer, more cracked wood (Common → Legendary), it can burst open at any tier for loot, and on a legendary you might just spin it into a Mango Dye. A Hypixel SkyBlock-flavoured reveal animation.",
+  "authors": ["Tree Gifts"],
+  "contact": {},
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "main": ["com.treegifts.TreeGiftsMod"],
+    "client": ["com.treegifts.client.TreeGiftsClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "*",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}

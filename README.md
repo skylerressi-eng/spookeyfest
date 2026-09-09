@@ -163,3 +163,12 @@ com.spookybirch
 
 Every feature reads from `SpookyState`, which `StateUpdater` refreshes each
 tick — so adding a new HUD line or data source stays a one-file change.
+
+## Also in this repo: 🌳🎁 Tree Gifts
+
+A separate **Fabric** mod lives in [`treegifts/`](treegifts/). Chop a tree and a
+wrapped Hardened Wood drops on screen; axes fly in and crack it open through the
+SkyBlock rarities (Common → Legendary), and a Legendary can spin into a **Mango
+Dye** jackpot. Same philosophy as SpookyBirch — all the roll logic is pure,
+Minecraft-free Java with a runnable test suite. See its
+[README](treegifts/README.md) to build and play.
