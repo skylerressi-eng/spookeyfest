@@ -9,5 +9,16 @@
     "authorList": ["skylerressi"],
     "credits": "Community candy/fishing data. Not affiliated with Hypixel.",
     "logoFile": ""
+  },
+  {
+    "modid": "dragonloot",
+    "name": "DragonLoot",
+    "description": "A gambling-style dragon egg reveal for the Hypixel SkyBlock dragon. Slay a summoned dragon and an egg cracks up the rarity ladder — Uncommon to Rare to Epic to Legendary — where each crack either breaks it open or escalates. Cosmetic and client-side only.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "url": "https://github.com/skylerressi-eng/spookeyfest",
+    "authorList": ["skylerressi"],
+    "credits": "Not affiliated with Hypixel.",
+    "logoFile": ""
   }
 ]
