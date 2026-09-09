@@ -8,9 +8,9 @@ import com.dragonloot.core.RollResult;
 import com.dragonloot.data.DragonReward;
 import com.dragonloot.render.EggRenderer;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 
 import java.util.Random;
 
@@ -28,23 +28,19 @@ import java.util.Random;
  *  4. BREAK  — the egg splits open on a beam of light, particles burst, and the
  *              reward card springs up (ease-out-back). Legendaries get a JACKPOT.
  *
- * Everything is wall-clock timed (frame-rate independent) and scaled by the
- * configured animation speed. All drawing is rectangles + text via DrawContext,
- * so there are no textures to ship.
+ * Wall-clock timed (frame-rate independent), scaled by the configured animation
+ * speed. All drawing is rectangles + text via GuiGraphics — no textures.
  */
 public class EggRevealScreen extends Screen {
 
-    // Base phase durations (ms), before the animation-speed scale.
     private static final double INTRO_MS = 550;
     private static final double SPIN_MS  = 3400;
     private static final double LOCK_MS  = 380;
     private static final double BREAK_MS = 2700;
-    private static final double AUTO_CLOSE_MS = 6500; // after break start
+    private static final double AUTO_CLOSE_MS = 6500;
 
     private static final int SPLIT_MAX = 5;
 
-    // The reel strip — weighted so legendaries are rare on the reel too (adds to
-    // the tease). Must contain every rarity.
     private static final Rarity[] STRIP = {
             Rarity.UNCOMMON, Rarity.RARE, Rarity.UNCOMMON, Rarity.EPIC,
             Rarity.UNCOMMON, Rarity.RARE, Rarity.UNCOMMON, Rarity.LEGENDARY,
@@ -57,7 +53,7 @@ public class EggRevealScreen extends Screen {
     private final Rarity finalR;
     private final long startMs;
 
-    private final int targetCells; // reel lands with this cell centered
+    private final int targetCells;
     private int lastTickCell = Integer.MIN_VALUE;
     private boolean lockSounded = false;
     private boolean breakSounded = false;
@@ -66,14 +62,13 @@ public class EggRevealScreen extends Screen {
     private final int[] pColor;
 
     public EggRevealScreen(RollResult result, DragonReward reward) {
-        super(Text.literal("Dragon Egg"));
+        super(Component.literal("Dragon Egg"));
         this.result = result;
         this.reward = reward;
         this.finalR = result.finalRarity();
         this.startMs = System.currentTimeMillis();
 
         Random r = new Random(0xE6601L + finalR.ordinal() + System.nanoTime());
-        // Pick a strip slot that shows the final rarity, then spin LOOPS times to it.
         int p;
         do { p = r.nextInt(STRIP.length); } while (STRIP[p] != finalR);
         this.targetCells = LOOPS * STRIP.length + p;
@@ -90,8 +85,8 @@ public class EggRevealScreen extends Screen {
     }
 
     @Override
-    public boolean shouldPause() {
-        return false; // multiplayer — we dim the screen ourselves
+    public boolean isPauseScreen() {
+        return false;
     }
 
     private double elapsed() {
@@ -105,7 +100,6 @@ public class EggRevealScreen extends Screen {
     private double lockEnd() { return spinEnd() + LOCK_MS; }
     private boolean finished() { return elapsed() >= lockEnd() + 300; }
 
-    /** Fractional reel position [0..targetCells], eased so it coasts to a stop. */
     private double cellUnits(double e) {
         if (e <= INTRO_MS) return 0;
         double t = Easing.clamp01((e - INTRO_MS) / SPIN_MS);
@@ -113,10 +107,9 @@ public class EggRevealScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphics ctx, int mouseX, int mouseY, float delta) {
         double e = elapsed();
 
-        // Dim + subtle casino vignette.
         ctx.fill(0, 0, width, height, 0xC0000000);
 
         int px = Math.max(4, Math.min(width, height) / 46);
@@ -124,7 +117,7 @@ public class EggRevealScreen extends Screen {
         int cx = width / 2;
         int topY = height / 2 - eggH / 2 - 26;
 
-        ctx.drawCenteredTextWithShadow(textRenderer, Text.literal("☘ DRAGON EGG GAMBLE ☘"), cx, topY - 40, 0xFFF1C40F);
+        ctx.drawCenteredString(font, Component.literal("☘ DRAGON EGG GAMBLE ☘"), cx, topY - 40, 0xFFF1C40F);
 
         if (e < spinEnd()) {
             renderSpin(ctx, e, cx, topY, px);
@@ -139,11 +132,10 @@ public class EggRevealScreen extends Screen {
         super.render(ctx, mouseX, mouseY, delta);
     }
 
-    private void renderSpin(DrawContext ctx, double e, int cx, int topY, int px) {
+    private void renderSpin(GuiGraphics ctx, double e, int cx, int topY, int px) {
         double introT = Easing.clamp01(e / INTRO_MS);
         double spinT = Easing.clamp01((e - INTRO_MS) / SPIN_MS);
 
-        // Egg pops in (outBack), then shakes hard early and calms as the reel slows.
         double bounce = e < INTRO_MS ? Easing.outBack(introT) : 1.0;
         int shake = (int) (Math.sin(e / 26.0) * (5.0 * (1.0 - spinT)) * (e < INTRO_MS ? 0 : 1));
 
@@ -151,16 +143,16 @@ public class EggRevealScreen extends Screen {
         int glowColor = Easing.mixColor(Rarity.UNCOMMON.argb, finalR.argb, Easing.inOutCubic(spinT));
         double pulse = 0.5 + 0.5 * Math.sin(e / 90.0);
 
-        int drawTop = topY + (int) ((1.0 - bounce) * 40); // slides down into place
+        int drawTop = topY + (int) ((1.0 - bounce) * 40);
         EggRenderer.drawEgg(ctx, cx, drawTop, px, glowColor, crackCount, shake, pulse);
 
         drawReel(ctx, cellUnits(e), cx, topY + EggRenderer.ROWS * px + 26, false);
 
-        ctx.drawCenteredTextWithShadow(textRenderer, Text.literal("spinning for your fate..."),
+        ctx.drawCenteredString(font, Component.literal("spinning for your fate..."),
                 cx, topY + EggRenderer.ROWS * px + 62, 0xFFBBBBBB);
     }
 
-    private void renderLock(DrawContext ctx, double e, int cx, int topY, int px) {
+    private void renderLock(GuiGraphics ctx, double e, int cx, int topY, int px) {
         double t = Easing.clamp01((e - spinEnd()) / LOCK_MS);
         int shake = (int) (Math.sin(e / 14.0) * 6 * (1 - t));
         EggRenderer.drawEgg(ctx, cx, topY, px, finalR.argb, finalR.cracks, shake, 1.0);
@@ -170,7 +162,7 @@ public class EggRevealScreen extends Screen {
         ctx.fill(0, 0, width, height, (a << 24) | (finalR.argb & 0xFFFFFF));
     }
 
-    private void renderBreak(DrawContext ctx, double tb, int cx, int topY, int px) {
+    private void renderBreak(GuiGraphics ctx, double tb, int cx, int topY, int px) {
         int split = (int) (Easing.outCubic(Easing.clamp01(tb / 700.0)) * SPLIT_MAX);
         double pulse = 0.5 + 0.5 * Math.sin(tb / 70.0);
 
@@ -178,7 +170,6 @@ public class EggRevealScreen extends Screen {
         drawParticles(ctx, cx, cyMid, tb);
         EggRenderer.drawEggBroken(ctx, cx, topY, px, finalR.argb, split, pulse);
 
-        // Reward card springs up from below with an overshoot.
         double cardT = Easing.outBack(Easing.clamp01((tb - 350) / 650.0));
         if (cardT > 0) {
             int cardW = Math.min(width - 40, 260);
@@ -187,34 +178,30 @@ public class EggRevealScreen extends Screen {
             int restY = topY + EggRenderer.ROWS * px + 20;
             int cardY = (int) (height - (height - restY) * cardT);
 
-            // panel + rarity-tinted border
             ctx.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0xE0101018);
             drawBorder(ctx, cardX, cardY, cardW, cardH, Easing.mixColor(finalR.argb, 0xFFFFFFFF, pulse * 0.4), 2);
 
             if (finalR == Rarity.LEGENDARY) {
-                ctx.drawCenteredTextWithShadow(textRenderer, Text.literal("★  J A C K P O T  ★"),
+                ctx.drawCenteredString(font, Component.literal("★  J A C K P O T  ★"),
                         cx, cardY - 16, 0xFFFFD700);
             }
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal(finalR.displayName.toUpperCase() + "!"),
+            ctx.drawCenteredString(font, Component.literal(finalR.displayName.toUpperCase() + "!"),
                     cx, cardY + 10, finalR.argb);
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal(reward.name),
+            ctx.drawCenteredString(font, Component.literal(reward.name),
                     cx, cardY + 28, Easing.mixColor(finalR.argb, 0xFFFFFFFF, 0.35));
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal(reward.note),
+            ctx.drawCenteredString(font, Component.literal(reward.note),
                     cx, cardY + 44, 0xFF9AA0A8);
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal("press any key to continue"),
+            ctx.drawCenteredString(font, Component.literal("press any key to continue"),
                     cx, height - 14, 0xFF666B72);
         }
     }
 
-    // ---- reel ----
-
-    private void drawReel(DrawContext ctx, double cellUnits, int cx, int cyCenter, boolean landed) {
+    private void drawReel(GuiGraphics ctx, double cellUnits, int cx, int cyCenter, boolean landed) {
         int cellW = 78, cellH = 30;
         int winW = Math.min(width - 40, 300);
         int winLeft = cx - winW / 2, winRight = cx + winW / 2;
         int top = cyCenter - cellH / 2, bot = cyCenter + cellH / 2;
 
-        // Window backdrop.
         ctx.fill(winLeft - 3, top - 3, winRight + 3, bot + 3, 0xFF05070C);
 
         int center = (int) Math.floor(cellUnits);
@@ -226,19 +213,17 @@ public class EggRevealScreen extends Screen {
             if (x2 < winLeft || x1 > winRight) continue;
             int body = Easing.mixColor(0xFF000000, r.argb, 0.30);
             ctx.fill(x1, top + 2, x2, bot - 2, body);
-            ctx.drawCenteredTextWithShadow(textRenderer, Text.literal(shortName(r)), cellCx, cyCenter - 4, r.argb);
+            ctx.drawCenteredString(font, Component.literal(shortName(r)), cellCx, cyCenter - 4, r.argb);
         }
 
-        // Mask cells overflowing the window edges.
         ctx.fill(0, top - 3, winLeft, bot + 3, 0xF00A0A0E);
         ctx.fill(winRight, top - 3, width, bot + 3, 0xF00A0A0E);
 
-        // Frame + center pointer.
         drawBorder(ctx, winLeft - 3, top - 3, winW + 6, cellH + 6, 0xFF2A2F3A, 2);
         int pointer = landed ? finalR.argb : 0xFFFFFFFF;
         drawBorder(ctx, cx - cellW / 2 + 1, top - 1, cellW - 2, cellH + 2, pointer, 2);
-        ctx.fill(cx - 4, top - 11, cx + 4, top - 5, pointer); // top nub
-        ctx.fill(cx - 4, bot + 5, cx + 4, bot + 11, pointer);  // bottom nub
+        ctx.fill(cx - 4, top - 11, cx + 4, top - 5, pointer);
+        ctx.fill(cx - 4, bot + 5, cx + 4, bot + 11, pointer);
     }
 
     private static String shortName(Rarity r) {
@@ -250,7 +235,7 @@ public class EggRevealScreen extends Screen {
         }
     }
 
-    private void drawParticles(DrawContext ctx, int cx, int cy, double tb) {
+    private void drawParticles(GuiGraphics ctx, int cx, int cy, double tb) {
         double life = tb / 900.0;
         for (int i = 0; i < pAngle.length; i++) {
             double dist = pSpeed[i] * tb / 13.0;
@@ -263,14 +248,12 @@ public class EggRevealScreen extends Screen {
         }
     }
 
-    private void drawBorder(DrawContext ctx, int x, int y, int w, int h, int color, int t) {
+    private void drawBorder(GuiGraphics ctx, int x, int y, int w, int h, int color, int t) {
         ctx.fill(x, y, x + w, y + t, color);
         ctx.fill(x, y + h - t, x + w, y + h, color);
         ctx.fill(x, y, x + t, y + h, color);
         ctx.fill(x + w - t, y, x + w, y + h, color);
     }
-
-    // ---- sound + lifecycle ----
 
     private void handleSounds(double e) {
         if (!DragonConfig.INSTANCE.playSounds) return;
@@ -295,12 +278,12 @@ public class EggRevealScreen extends Screen {
     }
 
     private void close() {
-        if (client != null) client.setScreen(null);
+        if (minecraft != null) minecraft.setScreen(null);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (finished() || keyCode == 256 /* ESC */) { close(); return true; }
+        if (finished() || keyCode == 256) { close(); return true; }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 

@@ -1,7 +1,6 @@
 plugins {
-    // Fabric Loom. If your Minecraft version is newer than this Loom supports,
-    // bump the version (latest is listed at https://fabricmc.net/develop).
-    id 'fabric-loom' version '1.7.4'
+    // Fabric Loom — newest line, needed for a Minecraft version this recent.
+    id 'fabric-loom' version '1.18.0-alpha.21'
     id 'maven-publish'
 }
 
@@ -19,7 +18,8 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    // 26.1.2 has no Yarn mappings published, so use official Mojang mappings.
+    mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 }
@@ -31,20 +31,22 @@ processResources {
     }
 }
 
+// Minecraft 26.1.2 requires Java 25.
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
     withSourcesJar()
 }
 
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = "UTF-8"
-    it.options.release = 21
+    it.options.release = 25
 }
 
-// The dependency-free core tests (src/test) don't need Minecraft on the
-// classpath and aren't JUnit — they're run via scripts/run-tests.sh, so keep
-// the Gradle `test` task from choking on them.
+// The dependency-free core tests (src/test) don't need Minecraft and aren't
+// JUnit — they run via scripts/run-tests.sh, so keep Gradle's `test` from
+// choking on them.
 test {
     enabled = false
 }

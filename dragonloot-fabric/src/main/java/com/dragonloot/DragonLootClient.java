@@ -7,6 +7,7 @@ import com.dragonloot.core.Rarity;
 import com.dragonloot.core.RollEngine;
 import com.dragonloot.gui.DragonGuideScreen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 
@@ -19,20 +20,20 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.loader.api.FabricLoader;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 
 import org.lwjgl.glfw.GLFW;
 
 /**
  * DragonLoot — a gambling-style egg reveal for the Minecraft/Hypixel dragon,
- * built for Fabric. Summon and slay a dragon and a dragon egg gambles its way up
- * the rarity ladder (Uncommon → Rare → Epic → Legendary) with a slot-machine
- * reveal. Client-side and cosmetic only — it reads chat to know when a dragon
- * died and never automates or touches your inventory.
+ * built for Fabric (Minecraft 26.1.2, Mojang mappings). Summon and slay a dragon
+ * and a dragon egg gambles its way up the rarity ladder (Uncommon → Rare → Epic
+ * → Legendary) with a slot-machine reveal. Client-side and cosmetic only — it
+ * reads chat to know when a dragon died and never automates or touches your
+ * inventory.
  *
  * Test it any time with <b>/dragongamble</b> (or the Test button in the guide).
  */
@@ -40,7 +41,7 @@ public class DragonLootClient implements ClientModInitializer {
 
     public static final String MODID = "dragonloot";
 
-    private KeyBinding guideKey;
+    private KeyMapping guideKey;
 
     // Chat trigger state machine (armed by a summon, fires on a dragon death).
     private boolean armed = false;
@@ -57,11 +58,11 @@ public class DragonLootClient implements ClientModInitializer {
     public void onInitializeClient() {
         DragonConfig.INSTANCE.load(FabricLoader.getInstance().getConfigDir());
 
-        guideKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                "key.dragonloot.guide", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_H, "category.dragonloot"));
+        guideKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.dragonloot.guide", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, "category.dragonloot"));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (guideKey.wasPressed()) {
+            while (guideKey.consumeClick()) {
                 client.setScreen(new DragonGuideScreen());
             }
         });
@@ -174,29 +175,29 @@ public class DragonLootClient implements ClientModInitializer {
     }
 
     private void openGuide() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> mc.setScreen(new DragonGuideScreen()));
     }
 
     private void stats(FabricClientCommandSource src) {
         DragonStats s = DragonStats.INSTANCE;
-        src.sendFeedback(Text.literal("☬ Dragon Luck").formatted(Formatting.DARK_PURPLE, Formatting.BOLD));
-        src.sendFeedback(Text.literal("Eggs cracked: " + s.total()).formatted(Formatting.GRAY));
+        src.sendFeedback(Component.literal("☬ Dragon Luck").withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD));
+        src.sendFeedback(Component.literal("Eggs cracked: " + s.total()).withStyle(ChatFormatting.GRAY));
         if (s.total() == 0) {
-            src.sendFeedback(Text.literal("None yet — try /dragongamble").formatted(Formatting.GRAY));
+            src.sendFeedback(Component.literal("None yet — try /dragongamble").withStyle(ChatFormatting.GRAY));
             return;
         }
         for (Rarity r : Rarity.values()) {
-            src.sendFeedback(Text.literal("  " + r.displayName + ": " + s.count(r)
-                    + String.format(" (%.1f%%)", s.share(r) * 100.0)).formatted(fmt(r)));
+            src.sendFeedback(Component.literal("  " + r.displayName + ": " + s.count(r)
+                    + String.format(" (%.1f%%)", s.share(r) * 100.0)).withStyle(fmt(r)));
         }
         Rarity best = s.best();
-        src.sendFeedback(Text.literal("Best pull: " + (best == null ? "none" : best.displayName))
-                .formatted(best == null ? Formatting.GRAY : fmt(best)));
+        src.sendFeedback(Component.literal("Best pull: " + (best == null ? "none" : best.displayName))
+                .withStyle(best == null ? ChatFormatting.GRAY : fmt(best)));
     }
 
     private void help(FabricClientCommandSource src) {
-        src.sendFeedback(Text.literal("☬ DragonLoot").formatted(Formatting.DARK_PURPLE, Formatting.BOLD));
+        src.sendFeedback(Component.literal("☬ DragonLoot").withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD));
         help(src, "/dragongamble", "play a reveal right now");
         help(src, "/dragonloot guide", "odds, luck & rewards GUI (key: H)");
         help(src, "/dragonloot stats", "your lifetime pulls");
@@ -208,24 +209,24 @@ public class DragonLootClient implements ClientModInitializer {
     }
 
     private void help(FabricClientCommandSource src, String cmd, String desc) {
-        src.sendFeedback(Text.literal(cmd + " ").formatted(Formatting.LIGHT_PURPLE)
-                .append(Text.literal("- " + desc).formatted(Formatting.GRAY)));
+        src.sendFeedback(Component.literal(cmd + " ").withStyle(ChatFormatting.LIGHT_PURPLE)
+                .append(Component.literal("- " + desc).withStyle(ChatFormatting.GRAY)));
     }
 
     private void ok(FabricClientCommandSource src, String msg) {
-        src.sendFeedback(Text.literal(msg).formatted(Formatting.GOLD));
+        src.sendFeedback(Component.literal(msg).withStyle(ChatFormatting.GOLD));
     }
 
     private void err(FabricClientCommandSource src, String msg) {
-        src.sendError(Text.literal(msg));
+        src.sendError(Component.literal(msg));
     }
 
-    private static Formatting fmt(Rarity r) {
+    private static ChatFormatting fmt(Rarity r) {
         switch (r) {
-            case UNCOMMON: return Formatting.GREEN;
-            case RARE: return Formatting.BLUE;
-            case EPIC: return Formatting.DARK_PURPLE;
-            default: return Formatting.GOLD;
+            case UNCOMMON: return ChatFormatting.GREEN;
+            case RARE: return ChatFormatting.BLUE;
+            case EPIC: return ChatFormatting.DARK_PURPLE;
+            default: return ChatFormatting.GOLD;
         }
     }
 }

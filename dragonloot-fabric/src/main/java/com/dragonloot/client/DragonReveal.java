@@ -8,7 +8,7 @@ import com.dragonloot.data.DragonReward;
 import com.dragonloot.data.RewardData;
 import com.dragonloot.gui.EggRevealScreen;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 import java.util.Random;
 
@@ -29,7 +29,7 @@ public final class DragonReveal {
         DragonConfig.INSTANCE.saveStats();
         DragonReward reward = RewardData.pick(result.finalRarity(), RNG);
 
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> mc.setScreen(new EggRevealScreen(result, reward)));
     }
 }

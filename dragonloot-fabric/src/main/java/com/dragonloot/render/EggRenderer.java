@@ -2,13 +2,13 @@ package com.dragonloot.render;
 
 import com.dragonloot.core.Easing;
 
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.Random;
 
 /**
  * Draws a Minecraft-style dragon egg entirely from filled rectangles via
- * {@link DrawContext#fill} — no texture assets to ship. The egg is a small pixel
+ * GuiGraphics.fill — no texture assets to ship. The egg is a small pixel
  * grid scaled up; cracks are jagged trails baked once with a fixed seed so they
  * look natural but render identically every frame. More cracks = higher tier,
  * and the "break open" mode splits the egg with a beam of rarity light.
@@ -40,14 +40,14 @@ public final class EggRenderer {
     private EggRenderer() {}
 
     /** The intact (but cracked) egg. */
-    public static void drawEgg(DrawContext ctx, int cx, int topY, int px, int rarityArgb, int crackCount, int shakeX, double glowPulse) {
+    public static void drawEgg(GuiGraphics ctx, int cx, int topY, int px, int rarityArgb, int crackCount, int shakeX, double glowPulse) {
         drawGlow(ctx, cx, topY, px, rarityArgb, 0, glowPulse);
         fillBody(ctx, cx + shakeX, topY, px, 0);
         drawCracks(ctx, cx + shakeX, topY, px, rarityArgb, crackCount);
     }
 
     /** The egg broken open: two halves shoved apart with a beam of light between. */
-    public static void drawEggBroken(DrawContext ctx, int cx, int topY, int px, int rarityArgb, int split, double glowPulse) {
+    public static void drawEggBroken(GuiGraphics ctx, int cx, int topY, int px, int rarityArgb, int split, double glowPulse) {
         drawGlow(ctx, cx, topY, px, rarityArgb, split, glowPulse);
 
         int beamHalf = Math.max(px, split * px / 2);
@@ -60,7 +60,7 @@ public final class EggRenderer {
         fillBody(ctx, cx, topY, px, split);
     }
 
-    private static void fillBody(DrawContext ctx, int cx, int topY, int px, int halfShift) {
+    private static void fillBody(GuiGraphics ctx, int cx, int topY, int px, int halfShift) {
         for (int row = 0; row < ROWS; row++) {
             int hw = HALF_WIDTH[row];
             int y = topY + row * px;
@@ -83,7 +83,7 @@ public final class EggRenderer {
         return (depth % 3 == 0) ? EGG_MID : EGG_DARK;
     }
 
-    private static void drawCracks(DrawContext ctx, int cx, int topY, int px, int rarityArgb, int crackCount) {
+    private static void drawCracks(GuiGraphics ctx, int cx, int topY, int px, int rarityArgb, int crackCount) {
         if (crackCount <= 0) return;
         int crackColor = Easing.mixColor(0xFFFFFFFF, rarityArgb, 0.45);
         int n = Math.min(crackCount, CRACKS.length);
@@ -98,7 +98,7 @@ public final class EggRenderer {
     }
 
     /** Soft rarity-colored halo behind the egg; {@code pulse} in [0,1] brightens it. */
-    private static void drawGlow(DrawContext ctx, int cx, int topY, int px, int rarityArgb, int split, double pulse) {
+    private static void drawGlow(GuiGraphics ctx, int cx, int topY, int px, int rarityArgb, int split, double pulse) {
         int cyMid = topY + (ROWS * px) / 2;
         int baseR = (maxHalfWidth() + 2) * px + split * px;
         int[] alphas = { 0x10, 0x16, 0x1E, 0x2C };

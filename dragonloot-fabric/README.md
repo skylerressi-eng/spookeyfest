@@ -66,10 +66,10 @@ in `config/dragonloot.properties`.
 
 ## Building
 
-You need **JDK 21**. From this folder (`dragonloot-fabric/`):
+Minecraft 26.1.2 requires **JDK 25**. From this folder (`dragonloot-fabric/`):
 
 ```bash
-gradle wrapper --gradle-version 8.10.2   # first time, to get ./gradlew
+gradle wrapper --gradle-version current   # first time, to get ./gradlew
 ./gradlew build
 ```
 
@@ -79,12 +79,13 @@ installed) and launch.
 
 ### Setting your Minecraft version
 
-The four coordinates in **`gradle.properties`** must match one real Minecraft
-version. Look them up at **https://fabricmc.net/develop** — pick your version and
-it prints the exact `yarn_mappings`, `loader_version` and `fabric_version`. They
-ship set for 26.1.2; if Fabric hasn't published that exact version yet, use the
-newest one listed there. If Loom is too old for a very new version, bump the
-`fabric-loom` version in `build.gradle`.
+The coordinates in **`gradle.properties`** must match one real Minecraft
+version. They ship set for **26.1.2** (`loader_version` and `fabric_version`
+confirmed from Fabric's metadata). Because 26.1.2 has **no Yarn mappings**, the
+build uses **official Mojang mappings** (`loom.officialMojangMappings()` in
+`build.gradle`) — the game-facing code is written against Mojang names to match.
+To retarget another version, update these from **https://fabricmc.net/develop**,
+and bump the `fabric-loom` version in `build.gradle` if Loom is too old for it.
 
 ### Prefer a download link?
 
