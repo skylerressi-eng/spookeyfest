@@ -8,6 +8,10 @@ mobs give the most candy**, and **what you can catch while spooky fishing**.
 Built as a **Forge 1.8.9** client mod — the same version SkyBlock QoL mods
 (SkyHanni, Skytils, NEU) run on.
 
+> 🐉 Looking for the **DragonLoot** dragon-egg gambling mod (Fabric)? It lives in
+> [`dragonloot-fabric/`](dragonloot-fabric/) with its own README. Test it with
+> `/dragongamble`.
+
 > ⚠️ Not affiliated with Hypixel. Candy/fishing numbers are community-sourced
 > **approximations** and easy to edit (see [Tuning the data](#tuning-the-data)).
 > This is a **client-side overlay** — it only reads text already on your screen
@@ -97,91 +101,6 @@ Fish anywhere during the fest to hook spooky sea creatures:
 
 **Grim Reaper** is the rarest and best for candy + gear.
 
----
-
-## 🐉 DragonLoot — the dragon egg gamble
-
-A second, self-contained mod that ships in the **same jar**. Summon and slay a
-dragon in **The End** and DragonLoot plays a **dragon-egg-cracking animation
-that gambles up the rarity ladder**:
-
-> **Uncommon → Rare → Epic → Legendary**
-
-The egg always *starts* cracking at **Uncommon** (small cracks). Then, one crack
-at a time, it either **breaks open** — locking in the current rarity and hatching
-its loot — or **cracks more** and **escalates one tier**. Keep escalating and you
-climb Rare → Epic → the coveted **Legendary**. Every step is a coin-flip against
-the odds, so the big pulls are genuinely rare.
-
-It's a **client-side cosmetic**: it reads chat to know when a dragon died and
-never touches your inventory or automates anything. The reward it "hatches" is
-flavor only.
-
-### How the gamble works
-
-| Tier | Default chance to *reach* it | Cracks shown |
-|------|------------------------------|--------------|
-| Uncommon | 50% (everything that doesn't escalate) | 2 |
-| Rare | 35% | 4 |
-| Epic | 12.75% | 7 |
-| Legendary | 2.25% | 11 |
-
-Those fall out of three **crack chances** you can tune: Uncommon→Rare `50%`,
-Rare→Epic `30%`, Epic→Legendary `15%`. There's also a global **luck**
-multiplier. See exactly what you're gambling against in the **Odds** tab of the
-guide, or `/dragonloot odds`.
-
-### Triggering it
-
-- **Automatically** when you kill a summoned dragon (the mod watches chat for the
-  summon, then the dragon's death). Toggle with `/dragonloot auto`.
-- **On demand** with `/dragonloot test` — great for showing it off — or the
-  **Test** button in the guide.
-
-The trigger phrases live in one place (`event/DragonWatcher.java`) and are easy
-to retune if Hypixel rewords a message.
-
-### Commands & keybind
-
-| Command | Does |
-|---------|------|
-| `/dragonloot` | Show help |
-| `/dragonloot test` | Play a reveal right now |
-| `/dragonloot guide` | Open the odds + luck + rewards GUI |
-| `/dragonloot stats` | Print your lifetime pulls to chat |
-| `/dragonloot odds <rare\|epic\|legendary> <%>` | Set a crack chance |
-| `/dragonloot luck <x>` | Set the global luck multiplier |
-| `/dragonloot sound` | Toggle the crack/reveal sounds |
-| `/dragonloot auto` | Toggle the auto-trigger on dragon death |
-| `/dragonloot reset` | Clear your lifetime stats |
-
-Aliases: `/dl`, `/dragon`. Keybind **default `H`** (rebindable under Controls →
-DragonLoot) opens the guide. Your lifetime pull counts persist in
-`config/dragonloot.cfg`.
-
-### Where its code lives
-
-```
-com.dragonloot
-├── DragonLoot           main @Mod entry
-├── core/                Rarity, RollEngine (the gamble), RollResult,
-│                        DragonStats (lifetime pulls), DragonLootConfig
-├── data/                RewardData / DragonReward (flavor loot tables)
-├── event/               DragonWatcher (chat trigger), DragonReveal (kick-off),
-│                        DragonKeyBinds
-├── gui/                 EggRevealScreen (the animation), DragonGuideScreen
-├── render/              EggRenderer (procedural egg + cracks — no textures)
-└── command/             /dragonloot
-```
-
-The whole gamble (`RollEngine`, `Rarity`, `DragonStats`, `RewardData`) is
-**Forge-free and deterministic** given a seeded RNG, so it's covered by the same
-plain-Java test harness (see [Tests](#tests)) — including a **1,000,000-roll**
-run that checks the odds hold, the rarity ladder is always contiguous, stats
-stay accurate and memory-bounded, and Legendaries stay rare.
-
----
-
 ## Building it
 
 Requires a JDK 8. From the repo root:
@@ -209,27 +128,17 @@ run without Forge:
 ./scripts/run-tests.sh
 ```
 
-It runs **both mods'** Forge-free suites:
-
-- **SpookyBirch** (~40 checks incl. a **500,000-event** simulation, ~27h of
-  play): candy is only ever added on gains (selling never rolls it back), the
-  score weighting, session/recent/best rates, the best-rate spike guard, ETA
-  math, reset behaviour, and that the rate window stays memory-bounded.
-- **DragonLoot** (34 checks incl. a **1,000,000-roll** run): the odds match
-  theory, every roll starts at Uncommon and escalates one tier at a time, luck
-  and clamping behave, the reward tables are complete, and the lifetime stats
-  stay accurate and memory-bounded.
-
-Both green:
+It runs ~40 checks including a **500,000-event** simulation (~27 hours of play)
+that verifies: candy is only ever added on gains (selling never rolls it back),
+the score weighting, session/recent/best rates, the best-rate spike guard, ETA
+math, reset behaviour, and that the rate window stays memory-bounded. All green:
 
 ```
-PASSED: 42   FAILED: 0     (SpookyBirch)
-DragonLoot  PASSED: 34   FAILED: 0
+PASSED: 42   FAILED: 0
 ```
 
-Both mods deliberately decouple their core logic from Forge (config values are
-pushed in, clocks/RNG are injectable), which is what makes them testable without
-a running Minecraft.
+`CandyTracker` is deliberately decoupled from Forge (config values are pushed in,
+and its clock is injectable) which is what makes this testable.
 
 ## Tuning the data
 

@@ -1,0 +1,51 @@
+name: Build DragonLoot (Fabric)
+
+# Builds the DragonLoot Fabric mod and publishes the finished .jar as a
+# downloadable artifact. Download it from the run's "Summary" page under
+# "Artifacts" → DragonLoot-jar, then drop the jar into your .minecraft/mods.
+#
+# The build only succeeds if the Fabric toolchain coordinates in
+# dragonloot-fabric/gradle.properties resolve for the target Minecraft version.
+# If a step fails with "Could not resolve ... yarn/fabric-api/loader", update
+# those four values from https://fabricmc.net/develop and push again.
+
+on:
+  push:
+    paths:
+      - "dragonloot-fabric/**"
+      - ".github/workflows/dragonloot.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Run dependency-free core tests
+        working-directory: dragonloot-fabric
+        run: bash scripts/run-tests.sh
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Build mod jar
+        working-directory: dragonloot-fabric
+        run: gradle build --stacktrace --no-daemon
+
+      - name: Upload jar artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DragonLoot-jar
+          path: dragonloot-fabric/build/libs/*.jar
+          if-no-files-found: error

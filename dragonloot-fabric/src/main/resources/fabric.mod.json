@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "dragonloot",
+  "version": "${version}",
+  "name": "DragonLoot",
+  "description": "A gambling-style dragon egg reveal. Slay a summoned dragon and a dragon egg cracks up the rarity ladder — Uncommon to Rare to Epic to Legendary — with a slot-machine animation. Cosmetic and client-side only. Test it with /dragongamble.",
+  "authors": ["skylerressi"],
+  "contact": {
+    "homepage": "https://github.com/skylerressi-eng/spookeyfest",
+    "sources": "https://github.com/skylerressi-eng/spookeyfest"
+  },
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.dragonloot.DragonLootClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "fabric-api": "*",
+    "minecraft": "*",
+    "java": ">=21"
+  }
+}
