@@ -102,24 +102,40 @@ full outcome distribution lands within tolerance. All green:
 PASSED: 41   FAILED: 0
 ```
 
-## Building it
+## Installing (just play it)
 
-Requires a **JDK 21**. From this `treegifts/` folder:
+Grab `treegifts-<version>.jar` from `build/libs/` (or the copy handed to you) and
+drop it into your `.minecraft/mods` folder for a **Fabric** profile, alongside
+**[Fabric API](https://modrinth.com/mod/fabric-api)**. Launch Minecraft **26.1.2
+(Fabric)** — chop a tree or press **G**.
+
+Requirements: **Minecraft 26.1.2**, **Fabric Loader** ≥ 0.19.3, **Fabric API**,
+and Java **25** (bundled with the 26.x launcher profile).
+
+## Building it yourself
+
+26.x needs **JDK 25** and **Gradle 9.5+** (a wrapper pinned to 9.5 is committed).
+From this `treegifts/` folder:
 
 ```bash
-gradle build          # or ./gradlew build once you've generated the wrapper
+JAVA_HOME=/path/to/jdk-25 ./gradlew build
 ```
 
-The finished jar lands in `build/libs/`. Drop it (plus **Fabric API**) into your
-`.minecraft/mods` folder for a **Fabric** profile and launch.
+The finished jar lands in `build/libs/treegifts-1.0.0.jar`.
 
-> **⚠️ Version note.** This mod is wired for **Minecraft 26.1.2 (Fabric)**, but
-> Fabric's coordinates (Minecraft, Yarn mappings, Loader, Fabric API) must all
-> point at a *real published* release or Gradle can't download them. They live in
-> one place — [`gradle.properties`](gradle.properties) — with a known-good modern
-> fallback (1.21.4) shown in comments. If 26.1.2 isn't out for Fabric yet, swap in
-> the newest set from <https://fabricmc.net/develop/> and
-> <https://modrinth.com/mod/fabric-api/versions>; **nothing in `src/` needs to
-> change.** The rendering code targets the 1.21.x client API — if your mappings
-> differ, only [`TreeGiftScreen`](src/main/java/com/treegifts/client/TreeGiftScreen.java)
-> may need small tweaks.
+> **Version note — how 26.x differs from older Fabric.** This mod is built for a
+> real, published **Minecraft 26.1.2**. Three things changed in the 26.x era and
+> are already handled in this project:
+> 1. **No Yarn / no obfuscation mappings.** Mojang ships 26.x *deobfuscated*, so
+>    `build.gradle` has **no `mappings` line** at all — you compile straight
+>    against the named jar.
+> 2. **Java 25** is required (26.x bumped the JDK).
+> 3. **New GUI system.** Screens draw via `extractRenderState(GuiGraphicsExtractor)`
+>    with a JOML `Matrix3x2fStack`, and keybinds register through
+>    `KeyMappingHelper` — see
+>    [`TreeGiftScreen`](src/main/java/com/treegifts/client/TreeGiftScreen.java) and
+>    [`TreeGiftsClient`](src/main/java/com/treegifts/client/TreeGiftsClient.java).
+>
+> All version numbers live in [`gradle.properties`](gradle.properties); check the
+> current set at <https://fabricmc.net/develop> and
+> <https://modrinth.com/mod/fabric-api/versions>.

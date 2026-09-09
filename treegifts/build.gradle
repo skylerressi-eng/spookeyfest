@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "${loom_version}"
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'java'
 }
 
@@ -8,25 +8,25 @@ group = project.maven_group
 base { archivesName = project.archives_base_name }
 
 repositories {
-    maven { url = "https://maven.fabricmc.net/" }
     mavenCentral()
 }
 
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
-    mappings "net.fabricmc:yarn:${yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    // Minecraft 26.x ships DEOBFUSCATED (real net.minecraft.* names), so there
+    // are no Yarn or Mojang obfuscation mappings to apply — loom needs no
+    // `mappings` line, matching the official fabric-example-mod for 26.x.
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 }
 
-// The whole "tree gift" roll engine (com.treegifts.core) has NO Minecraft
-// dependency on purpose — it's plain Java so it can be unit-tested without the
-// game (see ../tests and ../scripts/run-tests.sh). Only the client rendering
-// touches the Fabric/MC API.
+// The roll engine (com.treegifts.core) has NO Minecraft dependency on purpose —
+// it's plain Java, tested without the game (see ../tests, ../scripts/run-tests.sh).
+// Only the client code (com.treegifts.client) touches the Minecraft API.
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    // Minecraft 26.x runs on Java 25.
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
     withSourcesJar()
 }
 
@@ -38,9 +38,9 @@ processResources {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
+    it.options.release = 25
 }
 
 jar {
-    from("LICENSE") { rename { "${it}_${project.archivesBaseName}" } }
+    from("LICENSE") { rename { "${it}_${project.archives_base_name}" } }
 }
