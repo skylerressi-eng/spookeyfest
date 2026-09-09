@@ -18,7 +18,19 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    // 26.1.2 has no Yarn mappings published, so use official Mojang mappings.
+
+    // ---- MAPPINGS: the one line to set for your exact Minecraft version ----
+    // Verified from Mojang's + Fabric's metadata: 26.1.2 publishes NO Yarn
+    // mappings AND no Mojang "client_mappings" file, so BOTH of the lines below
+    // fail for 26.1.2 specifically. Whichever mapping set your 26.1.2 dev
+    // environment actually uses (copy it from https://fabricmc.net/develop for
+    // your version, or from a working 26.1.2 mod's build.gradle) goes here:
+    //
+    //   mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"   // if Yarn exists
+    //   mappings loom.officialMojangMappings()                     // if Mojang maps exist
+    //
+    // Left on officialMojangMappings() as the closest default; replace it with
+    // the exact `mappings` line from fabricmc.net/develop for 26.1.2.
     mappings loom.officialMojangMappings()
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
