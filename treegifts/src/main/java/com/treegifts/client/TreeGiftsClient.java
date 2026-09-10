@@ -2,6 +2,9 @@ package com.treegifts.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.treegifts.TreeGiftsMod;
+import com.treegifts.core.ItemIcons;
+import com.treegifts.core.Rarity;
+import com.treegifts.core.TreeGiftResult;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -37,7 +40,12 @@ public class TreeGiftsClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (replayKey.consumeClick()) {
                 if (!RealTreeGiftReveal.INSTANCE.replayLast()) {
-                    TreeGiftsMod.LOGGER.info("[Tree Gifts] no real Tree Gift seen yet — chop a tree on Galatea first.");
+                    // No real drop seen yet — play a clearly-labelled DEMO so you can
+                    // confirm the animation itself works (not a fabricated real drop).
+                    TreeGiftsMod.LOGGER.info("[Tree Gifts] no real Tree Gift yet — showing a DEMO reveal.");
+                    RealTreeGiftReveal.INSTANCE.enqueue(new TreeGiftResult(
+                            "Tree the Fish (demo)", Rarity.SPECIAL, -1, 0.05, "Fig", false,
+                            ItemIcons.iconFor("Tree the Fish")));
                 }
             }
         });

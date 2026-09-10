@@ -19,6 +19,8 @@ public class TreeGiftChatParserTest {
 
     public static void main(String[] args) {
         testRealGiftBlock();
+        testGuaranteedOnlyPlays();
+        testRewardCountFallback();
         testRarityFromColor();
         testNoFalsePositives();
         testBorderWithoutHeaderIgnored();
@@ -58,32 +60,50 @@ public class TreeGiftChatParserTest {
         feed(p, "                           §r§7§r§fSweep Booster §r§8(§r§a1%§r§8)");
         feed(p, "                          §r§7§r§cTree the Fish §r§8(§r§a0.05%§r§8)");
         feed(p, "§r§7A §r§dPhanpyre §r§7fell from the Tree!");
-        List<TreeGiftResult> out = p.feedLine(BORDER); // closing border -> results
+        List<TreeGiftResult> out = p.feedLine(BORDER); // closing border -> headline
 
-        ok(out.size() == 5, "5 notable drops parsed (got " + out.size() + ": " + out + ")");
+        // One headline per gift: the rarest drop. Tree the Fish is Special (§c),
+        // which outranks Phanpyre (Mythic) and everything else in this block.
+        ok(out.size() == 1, "one headline per gift (got " + out.size() + ": " + out + ")");
+        TreeGiftResult h = out.isEmpty() ? null : out.get(0);
+        ok(h != null && h.itemName.equals("Tree the Fish"), "headline = Tree the Fish (rarest)");
+        ok(h != null && h.rarity == Rarity.SPECIAL, "headline rarity = Special (§c)");
+        ok(h != null && "Fig".equals(h.treeType), "tree type = Fig");
+        ok(h != null && h.iconItemId.contains("cod"), "Tree the Fish icon = cod");
+    }
 
-        TreeGiftResult sticks = find(out, "Stretching Sticks");
-        ok(sticks != null && sticks.rarity == Rarity.UNCOMMON, "Stretching Sticks = Uncommon (§a)");
-        ok(sticks != null && Math.abs(sticks.dropChancePercent - 20.0) < 1e-6, "Stretching Sticks 20%");
-        ok(sticks != null && "Fig".equals(sticks.treeType), "tree type = Fig");
+    /** A plain tree (guaranteed items only, from the hover) must still reveal. */
+    static void testGuaranteedOnlyPlays() {
+        System.out.println("[Plain tree reveals from guaranteed items]");
+        TreeGiftChatParser p = new TreeGiftChatParser();
+        p.feedLine(BORDER);
+        p.feedLine("                                §r§9§lTREE GIFT");
+        p.feedLine("                 §r§7You helped cut §r§a100% §r§7of the §r§aHelix Tree§r§7.");
+        p.feedLine("                            §r§e+3 rewards gained! §8(hover)");
+        // These arrive from the hover in-game; fed as lines here.
+        p.feedLine("§2Forest Essence§r§8 x4");
+        p.feedLine("§3Foraging Experience §r§8x1,000");
+        p.feedLine("§aTender Wood §r§8x0-2");
+        List<TreeGiftResult> out = p.feedLine(BORDER);
+        ok(out.size() == 1, "plain tree yields exactly one headline (got " + out + ")");
+        TreeGiftResult h = out.isEmpty() ? null : out.get(0);
+        ok(h != null && h.itemName.equals("Foraging Experience"), "headline = biggest guaranteed item");
+        ok(h != null && h.amount == 1000, "headline amount parsed (1,000)");
+        ok(h != null && "Helix".equals(h.treeType), "tree type = Helix");
+    }
 
-        TreeGiftResult fish = find(out, "Tree the Fish");
-        ok(fish != null && fish.rarity == Rarity.SPECIAL, "Tree the Fish = Special (§c)");
-        ok(fish != null && Math.abs(fish.dropChancePercent - 0.05) < 1e-6, "Tree the Fish 0.05%");
-
-        TreeGiftResult sweep = find(out, "Sweep Booster");
-        ok(sweep != null && sweep.rarity == Rarity.COMMON, "Sweep Booster = Common (§f)");
-
-        TreeGiftResult book = find(out, "Enchanted Book (First Impression I)");
-        ok(book != null && book.rarity == Rarity.UNCOMMON, "Enchanted Book parsed with nested parens");
-
-        TreeGiftResult phan = find(out, "Phanpyre");
-        ok(phan != null && phan.phantom, "Phanpyre parsed as phantom");
-        ok(phan != null && phan.rarity == Rarity.MYTHIC, "Phanpyre = Mythic (§d)");
-
-        // Icons resolve (render stand-ins, presentation only).
-        ok(fish != null && fish.iconItemId.contains("cod"), "Tree the Fish icon = cod");
-        ok(phan != null && phan.iconItemId.contains("phantom_membrane"), "Phanpyre icon = phantom_membrane");
+    /** Even with no parsable items, the reward-count line still triggers a reveal. */
+    static void testRewardCountFallback() {
+        System.out.println("[Reward-count fallback]");
+        TreeGiftChatParser p = new TreeGiftChatParser();
+        p.feedLine(BORDER);
+        p.feedLine("        §r§9§lTREE GIFT");
+        p.feedLine("        §r§7You helped cut §r§a50% §r§7of the §r§aFig Tree§r§7.");
+        p.feedLine("        §r§e+7 rewards gained!");
+        List<TreeGiftResult> out = p.feedLine(BORDER);
+        ok(out.size() == 1, "reward-count fallback yields a headline");
+        TreeGiftResult h = out.isEmpty() ? null : out.get(0);
+        ok(h != null && h.itemName.equals("Tree Gift") && h.amount == 7, "generic 'Tree Gift' x7 headline");
     }
 
     /** The rarity must come from the colour, not the item name. */
