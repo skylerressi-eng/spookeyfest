@@ -1,9 +1,7 @@
 package com.treegifts.client;
 
-import com.treegifts.core.GiftResult;
-import com.treegifts.core.GiftStep;
-import com.treegifts.core.LootTables;
 import com.treegifts.core.Rarity;
+import com.treegifts.core.TreeGiftResult;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -24,99 +22,81 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * The tree-gift reveal (Minecraft 26.1.2 GUI system).
+ * The REAL Tree Gift reveal (Minecraft 26.1.2 GUI system).
  *
- * A wrapped Hardened Wood drops in; axes fly in and thud into it one by one. Each
- * hit cracks it more and (per the pre-rolled {@link GiftResult}) either bumps it a
- * rarity or splits it open for loot. Reach Legendary and it might spin into a
- * Mango Dye. Then the reward flies out under rotating rarity-coloured rays, with
- * confetti.
+ * A Hardened Wood target drops in; three iron axes fly in from varied directions,
+ * spinning, and thud into it with shake + particles; the wood cracks and breaks;
+ * then the ACTUAL drop Hypixel gave you — {@link TreeGiftResult}, parsed from chat
+ * — bursts out with rarity-scaled glow, rays, and confetti.
  *
- * The screen only *plays* the pre-rolled {@link GiftResult}; the outcome is
- * decided by the Minecraft-free {@link com.treegifts.core.TreeGiftRoller}. Timing
- * runs off wall-clock ms so it's smooth regardless of tick rate.
+ * The result is locked: this screen only decides HOW the real drop is revealed,
+ * never WHAT it is. Higher rarities get a bigger reveal. It auto-closes so it
+ * doesn't interrupt foraging for long, and the queue advances to the next drop.
  *
- * 26.x specifics: screens draw via {@code extractRenderState(GuiGraphicsExtractor)}
- * and transform through a JOML {@link Matrix3x2fStack} from {@code pose()}
- * (rotations in radians).
+ * 26.x rendering: draws via GuiGraphicsExtractor; transforms via the JOML
+ * Matrix3x2fStack from pose() (rotations in radians).
  */
 public class TreeGiftScreen extends Screen {
 
     // --- timeline (ms) ---
-    private static final long INTRO_MS       = 700;
-    private static final long BEAT_MS        = 800;
-    private static final long MANGO_BEAT_MS  = 1650;
-    private static final long IMPACT_AT      = 340;
-    private static final long MANGO_TWIST_AT = 1300;
+    private static final long INTRO_MS   = 650;   // Hardened Wood drops in
+    private static final int  AXES       = 3;     // iron axes thrown
+    private static final long STAGGER_MS = 520;   // gap between axe throws
+    private static final long FLIGHT_MS  = 300;   // time from launch to impact
+    private static final long BREAK_MS   = 150;   // shake before the wood breaks
+    private static final long SPLIT_MS   = 280;   // wood splitting open
+    private static final long AUTO_CLOSE_AFTER_REVEAL_MS = 4200;
 
-    private static final int WOOD_SCALE = 6; // item px (16) -> screen px multiplier
+    private static final int WOOD_SCALE = 6;
 
-    private final GiftResult result;
+    private final TreeGiftResult result;
     private final long startMs = now();
     private final Random rng = new Random();
     private final List<Particle> particles = new ArrayList<>();
 
-    private final ItemStack woodStack;
-    private final ItemStack axeStack;
-    private final ItemStack rewardStack;
+    private final ItemStack woodStack;   // the Hardened Wood target
+    private final ItemStack axeStack;     // iron axe
+    private final ItemStack rewardStack;  // the REAL drop's icon
 
     private int lastImpactHandled = -1;
+    private boolean breakSoundDone = false;
     private boolean finaleBurstDone = false;
     private long skipToMs = -1;
+    private boolean closed = false;
 
-    public TreeGiftScreen(GiftResult result) {
+    public TreeGiftScreen(TreeGiftResult result) {
         super(Component.literal("Tree Gift"));
         this.result = result;
-        this.woodStack = new ItemStack(Items.OAK_LOG);
+        this.woodStack = new ItemStack(Items.OAK_LOG); // Hardened Wood stand-in
         this.axeStack = new ItemStack(Items.IRON_AXE);
-        this.rewardStack = new ItemStack(itemFor(result.loot.itemId));
-        this.rewardStack.setCount(Math.max(1, Math.min(64, result.loot.amount)));
+        this.rewardStack = new ItemStack(itemFor(result.iconItemId));
+        if (result.hasAmount()) rewardStack.setCount(Math.max(1, Math.min(64, result.amount)));
     }
 
-    // ────────────────────────────────────────────────────────────── lifecycle
+    // ────────────────────────────────────────────── timeline helpers
 
-    @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
+    @Override public boolean isPauseScreen() { return false; }
 
-    private static long now() {
-        return System.currentTimeMillis();
-    }
+    private static long now() { return System.currentTimeMillis(); }
 
     private long elapsed() {
         long e = now() - startMs;
         return skipToMs >= 0 ? Math.max(e, skipToMs) : e;
     }
 
-    private long beatDur(int i) {
-        return result.steps.get(i).type == GiftStep.Type.MANGO ? MANGO_BEAT_MS : BEAT_MS;
-    }
+    private long lastImpactMs() { return INTRO_MS + (AXES - 1) * STAGGER_MS + FLIGHT_MS; }
+    private long breakMs()      { return lastImpactMs() + BREAK_MS; }
+    private long revealMs()     { return breakMs() + SPLIT_MS; }
+    private long autoCloseMs()  { return revealMs() + AUTO_CLOSE_AFTER_REVEAL_MS; }
 
-    private long beatStart(int i) {
-        long t = 0;
-        for (int k = 0; k < i; k++) t += beatDur(k);
-        return t;
-    }
+    private long axeLaunch(int i) { return INTRO_MS + (long) i * STAGGER_MS; }
+    private long axeImpact(int i) { return axeLaunch(i) + FLIGHT_MS; }
 
-    private long totalBeatsMs() {
-        return beatStart(result.steps.size());
-    }
-
-    private long finaleStartMs() {
-        return INTRO_MS + totalBeatsMs();
-    }
-
-    private long absImpact(int i) {
-        long within = result.steps.get(i).type == GiftStep.Type.MANGO ? MANGO_TWIST_AT : IMPACT_AT;
-        return INTRO_MS + beatStart(i) + within;
-    }
-
-    // ────────────────────────────────────────────────────────────── input
+    // ────────────────────────────────────────────── input
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (event.key() == 256) return super.keyPressed(event); // Esc closes normally
+        if (event.key() == 256) { close(); return true; } // Esc
         advanceOrClose();
         return true;
     }
@@ -127,29 +107,38 @@ public class TreeGiftScreen extends Screen {
         return true;
     }
 
-    /** Before the finale: skip straight to the reward. During it: collect & close. */
     private void advanceOrClose() {
-        if (elapsed() < finaleStartMs()) {
-            skipToMs = finaleStartMs();
-            lastImpactHandled = result.steps.size() - 1; // don't machine-gun skipped sounds
-            playSound(SoundEvents.ITEM_PICKUP, 1.4f);
-        } else if (this.minecraft != null) {
-            this.minecraft.setScreen(null);
+        if (elapsed() < revealMs()) {
+            skipToMs = revealMs();
+            lastImpactHandled = AXES; // suppress skipped impact sounds
+        } else {
+            close();
         }
     }
 
-    // ────────────────────────────────────────────────────────────── render
+    private void close() {
+        if (closed) return;
+        closed = true;
+        if (minecraft != null) minecraft.setScreen(null);
+    }
+
+    @Override
+    public void removed() {
+        // However the screen goes away (auto-close, Esc, click), advance the queue.
+        RealTreeGiftReveal.INSTANCE.onRevealClosed();
+    }
+
+    // ────────────────────────────────────────────── render
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         long e = elapsed();
-        long finaleStart = finaleStartMs();
-        boolean finale = e >= finaleStart;
+        if (e >= autoCloseMs()) { close(); return; }
 
         fireImpactsUpTo(e);
+        maybeBreak(e);
         updateParticles();
 
-        // Dim backdrop (drawn ourselves so it's independent of the base screen).
         g.fill(0, 0, width, height, 0xC8000000);
         g.fillGradient(0, 0, width, height, 0x00000000, 0x66000000);
 
@@ -159,179 +148,141 @@ public class TreeGiftScreen extends Screen {
         Matrix3x2fStack pose = g.pose();
         float shake = shakeAt(e);
         pose.pushMatrix();
-        if (shake > 0.01f) {
-            pose.translate((rng.nextFloat() - 0.5f) * shake, (rng.nextFloat() - 0.5f) * shake);
-        }
+        if (shake > 0.01f) pose.translate((rng.nextFloat() - 0.5f) * shake, (rng.nextFloat() - 0.5f) * shake);
 
-        if (finale) {
-            renderFinale(g, cx, cy, e - finaleStart);
+        boolean reveal = e >= breakMs();
+        if (reveal) {
+            renderReveal(g, cx, cy, e - breakMs());
         } else if (e < INTRO_MS) {
             renderIntro(g, cx, cy, e / (float) INTRO_MS);
         } else {
-            renderBeats(g, cx, cy, e - INTRO_MS);
+            renderAxePhase(g, cx, cy, e);
         }
 
         renderParticles(g);
         pose.popMatrix();
 
-        renderHud(g, e, finale);
+        renderHud(g, e, reveal);
     }
 
     private void renderIntro(GuiGraphicsExtractor g, int cx, int cy, float t) {
         float s = easeOutBack(clamp01(t));
         drawGlowDisc(g, cx, cy, (int) (46 * s), 0x33FFFFFF);
-        drawWood(g, cx, cy, WOOD_SCALE * s, 0, true, null, 0f);
-        if (rng.nextInt(3) == 0) {
-            spawn(cx + rand(-40, 40), cy + rand(-30, 30), rand(-10, 10), rand(-30, -5),
-                    0xFFFFF0A0, 500 + rng.nextInt(300), 2f);
+        drawBigItem(g, woodStack, cx, cy, WOOD_SCALE * s);
+    }
+
+    /** Hardened Wood sits center; iron axes fly in and thud, cracks accumulate. */
+    private void renderAxePhase(GuiGraphicsExtractor g, int cx, int cy, long e) {
+        int landed = 0;
+        for (int i = 0; i < AXES; i++) if (e >= axeImpact(i)) landed++;
+
+        drawGlowDisc(g, cx, cy, 44, 0x22FFFFFF);
+        // Impact punch on the wood right after the latest hit.
+        float punch = 1f;
+        for (int i = 0; i < AXES; i++) {
+            long since = e - axeImpact(i);
+            if (since >= 0 && since < 130) punch = Math.max(punch, 1f + 0.18f * (1f - since / 130f));
+        }
+        drawBigItem(g, woodStack, cx, cy, WOOD_SCALE * punch);
+        drawCracks(g, cx, cy, (int) (16 * WOOD_SCALE), landed);
+
+        // Any axe currently in flight.
+        for (int i = 0; i < AXES; i++) {
+            long since = e - axeLaunch(i);
+            if (since >= 0 && since < FLIGHT_MS) {
+                drawFlyingAxe(g, cx, cy, since / (float) FLIGHT_MS, i);
+            }
         }
     }
 
-    private void renderBeats(GuiGraphicsExtractor g, int cx, int cy, long t) {
-        int b = 0;
-        long acc = 0;
-        while (b < result.steps.size() - 1 && t >= acc + beatDur(b)) {
-            acc += beatDur(b);
-            b++;
-        }
-        long local = t - acc;
-        GiftStep step = result.steps.get(b);
+    /** Wood splits; the REAL drop scales up under rarity-coloured rays + confetti. */
+    private void renderReveal(GuiGraphicsExtractor g, int cx, int cy, long local) {
+        int color = result.rarity.color;
+        float drama = 0.35f + 0.65f * result.rarity.drama();
 
-        long within = step.type == GiftStep.Type.MANGO ? MANGO_TWIST_AT : IMPACT_AT;
-        boolean landed = local >= within;
-        int impactsDone = b + (landed ? 1 : 0);
-        Rarity shown = impactsDone == 0 ? null : result.steps.get(impactsDone - 1).rarity;
-        int cracks = Math.max(0, impactsDone - 1) + (landed && step.type != GiftStep.Type.MANGO ? 1 : 0);
-
-        int glow = shown == null ? 0x33FFFFFF : withAlpha(shown.color, 0.28f);
-        drawGlowDisc(g, cx, cy, 48 + (shown == null ? 0 : shown.ordinal() * 5), glow);
-
-        if (step.type == GiftStep.Type.MANGO) {
-            renderSpin(g, cx, cy, local);
+        if (local < SPLIT_MS) {
+            float sp = easeOutCubic(clamp01(local / (float) SPLIT_MS));
+            int off = (int) (sp * 34);
+            drawGlowDisc(g, cx, cy, (int) (40 * (1 - sp) + 30), withAlpha(color, 0.4f * (1f - sp)));
+            drawBigItem(g, woodStack, cx - off, cy - (int) (sp * 8), WOOD_SCALE * (1f - 0.3f * sp));
+            drawBigItem(g, woodStack, cx + off, cy + (int) (sp * 8), WOOD_SCALE * (1f - 0.3f * sp));
+            if (sp > 0.35f) {
+                drawBigItem(g, rewardStack, cx, cy, WOOD_SCALE * easeOutBack(clamp01((sp - 0.35f) / 0.65f)) * 0.9f);
+            }
             return;
         }
 
-        boolean terminalCrack = step.type == GiftStep.Type.CRACK;
-        if (landed && terminalCrack) {
-            float sp = easeOutCubic(clamp01((local - within) / (float) (beatDur(b) - within)));
-            drawSplitWood(g, cx, cy, shown, cracks, sp);
-        } else {
-            float punch = landed ? 1f + 0.18f * (1f - clamp01((local - within) / 130f)) : 1f;
-            drawWood(g, cx, cy, WOOD_SCALE * punch, cracks, false, shown, landed ? flashAt(local - within) : 0f);
-        }
-
-        if (!landed) {
-            float f = clamp01(local / (float) within);
-            drawFlyingAxe(g, cx, cy, f, b);
-        }
-    }
-
-    private void renderSpin(GuiGraphicsExtractor g, int cx, int cy, long local) {
-        if (local < MANGO_TWIST_AT) {
-            float p = clamp01(local / (float) MANGO_TWIST_AT);
-            float spins = 2f + easeInCubic(p) * 10f;
-            float angleDeg = spins * 360f * p;
-            float scale = WOOD_SCALE * (1f + 0.15f * (float) Math.sin(p * Math.PI * 6));
-            drawGlowDisc(g, cx, cy, (int) (54 + 30 * p), withAlpha(LootTables.MANGO_COLOR, 0.35f + 0.4f * p));
-            drawWoodRotated(g, cx, cy, scale, angleDeg);
-            if (rng.nextInt(2) == 0) {
-                spawn(cx + rand(-30, 30), cy + rand(-30, 30), rand(-40, 40), rand(-60, 20),
-                        LootTables.MANGO_COLOR, 400, 2.5f);
-            }
-        } else {
-            float p = clamp01((local - MANGO_TWIST_AT) / (float) (MANGO_BEAT_MS - MANGO_TWIST_AT));
-            drawGlowDisc(g, cx, cy, (int) (84 - 20 * p), withAlpha(LootTables.MANGO_COLOR, 0.6f * (1f - p)));
-            drawBigItem(g, rewardStack, cx, cy, WOOD_SCALE * easeOutBack(p));
-        }
-    }
-
-    private void renderFinale(GuiGraphicsExtractor g, int cx, int cy, long local) {
-        int color = result.loot.color;
-        float in = easeOutBack(clamp01(local / 400f));
-
-        drawRays(g, cx, cy, 30, 150, 16, withAlpha(color, 0.22f), local * 0.03f);
-        drawRays(g, cx, cy, 20, 110, 16, withAlpha(color, 0.30f), -local * 0.05f + 11);
-        drawGlowDisc(g, cx, cy, 60, withAlpha(color, 0.30f));
+        long t = local - SPLIT_MS;
+        float in = easeOutBack(clamp01(t / 380f));
+        int rays = (int) (10 + 12 * drama);
+        drawRays(g, cx, cy, 30, (int) (110 + 70 * drama), rays, withAlpha(color, 0.22f), t * 0.03f);
+        drawRays(g, cx, cy, 20, (int) (80 + 50 * drama), rays, withAlpha(color, 0.30f), -t * 0.05f + 11);
+        drawGlowDisc(g, cx, cy, (int) (46 + 34 * drama), withAlpha(color, 0.28f + 0.22f * drama));
         drawBigItem(g, rewardStack, cx, cy - 4, WOOD_SCALE * in);
 
         if (!finaleBurstDone) {
             finaleBurstDone = true;
-            playSound(result.mango ? SoundEvents.TOTEM_USE : SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f);
-            for (int i = 0; i < 60; i++) {
-                spawn(cx, cy, rand(-120, 120), rand(-160, -20), confetti(color), 900 + rng.nextInt(700), 3f);
+            playFinaleSound();
+            int n = (int) (25 + 90 * drama);
+            for (int i = 0; i < n; i++) {
+                spawn(cx, cy, rand(-120, 120), rand(-170, -20), confetti(color), 900 + rng.nextInt(800), 3f);
             }
         }
-        if (rng.nextInt(2) == 0) {
+        // Ongoing confetti drizzle for the higher rarities.
+        if (result.rarity.ordinal() >= Rarity.RARE.ordinal() && rng.nextInt(2) == 0) {
             spawn(rand(0, width), -6, rand(-15, 15), rand(20, 70), confetti(color), 1400, 3f);
         }
     }
 
-    // ────────────────────────────────────────────────────────────── HUD text
+    // ────────────────────────────────────────────── HUD text
 
-    private void renderHud(GuiGraphicsExtractor g, long e, boolean finale) {
+    private void renderHud(GuiGraphicsExtractor g, long e, boolean reveal) {
         int top = Math.max(14, height / 2 - 118);
         g.centeredText(font, "TREE GIFT", width / 2, top, 0xFFFFD24A);
+        if (!result.treeType.isEmpty()) {
+            g.centeredText(font, result.treeType + " Tree", width / 2, top + 12, 0xFF9BE8A0);
+        }
 
-        if (finale) {
-            String name = result.loot.name + (rewardStack.getCount() > 1 ? " x" + result.loot.amount : "");
-            g.centeredText(font, name, width / 2, height / 2 + 60, result.loot.color);
-            g.centeredText(font, result.loot.flavor, width / 2, height / 2 + 74, 0xFFBBBBBB);
-            String tier = result.mango ? "* MANGO DYE *" : result.finalRarity.display;
-            g.centeredText(font, tier, width / 2, height / 2 + 90,
-                    result.mango ? LootTables.MANGO_COLOR : result.finalRarity.color);
+        if (reveal && e >= breakMs() + SPLIT_MS) {
+            String name = result.itemName + (result.hasAmount() ? " x" + result.amount : "");
+            g.centeredText(font, name, width / 2, height / 2 + 60, result.rarity.color);
+            g.centeredText(font, result.rarity.display, width / 2, height / 2 + 74, result.rarity.color);
+            if (result.hasDropChance()) {
+                g.centeredText(font, trimPct(result.dropChancePercent) + "% drop", width / 2, height / 2 + 88, 0xFF9AA0A6);
+            }
             if ((e / 500) % 2 == 0) {
-                g.centeredText(font, "Click or press a key to collect", width / 2, height / 2 + 108, 0xFFFFF055);
+                g.centeredText(font, "Click to dismiss", width / 2, height / 2 + 106, 0xFFCFCFCF);
             }
         } else {
-            Rarity shown = currentShownRarity(e);
-            String banner = shown == null ? "Wrapped Hardened Wood..."
-                    : shown.display + " Hardened Wood";
-            g.centeredText(font, banner, width / 2, height / 2 + 66, shown == null ? 0xFFAAAAAA : shown.color);
             g.centeredText(font, "click to skip", width / 2, height - 24, 0xFF888888);
         }
     }
 
-    private Rarity currentShownRarity(long e) {
-        if (e < INTRO_MS) return null;
-        long t = e - INTRO_MS;
-        Rarity shown = null;
-        long acc = 0;
-        for (int i = 0; i < result.steps.size(); i++) {
-            long within = result.steps.get(i).type == GiftStep.Type.MANGO ? MANGO_TWIST_AT : IMPACT_AT;
-            if (t >= acc + within) shown = result.steps.get(i).rarity;
-            acc += beatDur(i);
-        }
-        return shown;
-    }
-
-    // ────────────────────────────────────────────────────────── impacts / sound
+    // ────────────────────────────────────────────── impacts / sound
 
     private void fireImpactsUpTo(long e) {
         int cx = width / 2, cy = height / 2 - 6;
-        for (int b = lastImpactHandled + 1; b < result.steps.size(); b++) {
-            if (e < absImpact(b)) break;
-            lastImpactHandled = b;
-            GiftStep step = result.steps.get(b);
-            switch (step.type) {
-                case REVEAL:
-                    playSound(SoundEvents.AMETHYST_BLOCK_CHIME, 1.2f);
-                    burst(cx, cy, 14, step.rarity.color, 60);
-                    break;
-                case UPGRADE:
-                    playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.8f + step.rarity.ordinal() * 0.22f);
-                    burst(cx, cy, 18, step.rarity.color, 80);
-                    break;
-                case CRACK:
-                    playSound(SoundEvents.ITEM_PICKUP, 0.9f);
-                    playSound(SoundEvents.PLAYER_LEVELUP, 1.1f);
-                    burst(cx, cy, 40, step.rarity.color, 130);
-                    break;
-                case MANGO:
-                    playSound(SoundEvents.ENDER_DRAGON_GROWL, 1.4f);
-                    burst(cx, cy, 70, LootTables.MANGO_COLOR, 170);
-                    break;
-            }
+        for (int i = lastImpactHandled + 1; i < AXES; i++) {
+            if (e < axeImpact(i)) break;
+            lastImpactHandled = i;
+            playSound(SoundEvents.ITEM_PICKUP, 0.8f + i * 0.15f);
+            burst(cx, cy, 16 + i * 6, 0xFFC9A66B, 80);
         }
+    }
+
+    private void maybeBreak(long e) {
+        if (!breakSoundDone && e >= breakMs()) {
+            breakSoundDone = true;
+            int cx = width / 2, cy = height / 2 - 6;
+            playSound(SoundEvents.PLAYER_LEVELUP, 1.2f);
+            burst(cx, cy, 30, 0xFFC9A66B, 120);
+        }
+    }
+
+    private void playFinaleSound() {
+        boolean big = result.rarity.ordinal() >= Rarity.LEGENDARY.ordinal();
+        playSound(big ? SoundEvents.ENDER_DRAGON_GROWL : SoundEvents.AMETHYST_BLOCK_CHIME, big ? 1.0f : 1.3f);
+        playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f);
     }
 
     private void playSound(SoundEvent event, float pitch) {
@@ -341,61 +292,7 @@ public class TreeGiftScreen extends Screen {
         }
     }
 
-    // ────────────────────────────────────────────────────────── drawing helpers
-
-    private void drawWood(GuiGraphicsExtractor g, int cx, int cy, float scale, int cracks,
-                          boolean wrapped, Rarity rarity, float flash) {
-        if (rarity != null) {
-            int r = (int) (16 * scale / 2f) + 6;
-            drawGlowDisc(g, cx, cy, r, withAlpha(rarity.color, 0.5f));
-        }
-        drawBigItem(g, woodStack, cx, cy, scale);
-        drawCracks(g, cx, cy, (int) (16 * scale), cracks);
-        if (wrapped) {
-            g.centeredText(font, "?", cx, cy - 4, 0xFFFFFFFF);
-        }
-        if (flash > 0.01f) {
-            int r = (int) (16 * scale / 2f) + 4;
-            drawGlowDisc(g, cx, cy, r, withAlpha(0xFFFFFFFF, 0.6f * flash));
-        }
-    }
-
-    private void drawWoodRotated(GuiGraphicsExtractor g, int cx, int cy, float scale, float angleDeg) {
-        Matrix3x2fStack pose = g.pose();
-        pose.pushMatrix();
-        pose.translate(cx, cy);
-        pose.rotate((float) Math.toRadians(angleDeg));
-        pose.scale(scale, scale);
-        pose.translate(-8, -8);
-        g.item(woodStack, 0, 0);
-        pose.popMatrix();
-    }
-
-    private void drawSplitWood(GuiGraphicsExtractor g, int cx, int cy, Rarity rarity, int cracks, float sp) {
-        int off = (int) (sp * 34);
-        drawGlowDisc(g, cx, cy, 40, withAlpha(rarity == null ? 0xFFFFFFFF : rarity.color, 0.4f * (1f - sp)));
-        drawBigItem(g, woodStack, cx - off, cy - (int) (sp * 8), WOOD_SCALE * (1f - 0.3f * sp));
-        drawBigItem(g, woodStack, cx + off, cy + (int) (sp * 8), WOOD_SCALE * (1f - 0.3f * sp));
-        if (sp > 0.35f) {
-            drawBigItem(g, rewardStack, cx, cy, WOOD_SCALE * easeOutBack(clamp01((sp - 0.35f) / 0.65f)) * 0.9f);
-        }
-    }
-
-    private void drawFlyingAxe(GuiGraphicsExtractor g, int cx, int cy, float f, int beat) {
-        boolean fromLeft = (beat % 2) == 0;
-        float startX = fromLeft ? -30 : width + 30;
-        float x = lerp(startX, cx, easeOutCubic(f));
-        float y = lerp(cy - 70, cy, f) + (float) Math.sin(f * Math.PI) * -18f;
-        float spinDeg = (fromLeft ? 1 : -1) * f * 540f;
-        Matrix3x2fStack pose = g.pose();
-        pose.pushMatrix();
-        pose.translate(x, y);
-        pose.rotate((float) Math.toRadians(spinDeg));
-        pose.scale(2.2f, 2.2f);
-        pose.translate(-8, -8);
-        g.item(axeStack, 0, 0);
-        pose.popMatrix();
-    }
+    // ────────────────────────────────────────────── drawing helpers
 
     private void drawBigItem(GuiGraphicsExtractor g, ItemStack stack, int cx, int cy, float scale) {
         if (scale <= 0.01f) return;
@@ -408,6 +305,24 @@ public class TreeGiftScreen extends Screen {
         pose.popMatrix();
     }
 
+    private void drawFlyingAxe(GuiGraphicsExtractor g, int cx, int cy, float f, int i) {
+        // Each axe comes from a slightly different direction and arc.
+        boolean fromLeft = (i % 2) == 0;
+        float startX = fromLeft ? -30 : width + 30;
+        float startY = cy - 80 + i * 26;
+        float x = lerp(startX, cx, easeOutCubic(f));
+        float y = lerp(startY, cy, f) + (float) Math.sin(f * Math.PI) * -16f;
+        float spinDeg = (fromLeft ? 1 : -1) * f * (500f + i * 60f);
+        Matrix3x2fStack pose = g.pose();
+        pose.pushMatrix();
+        pose.translate(x, y);
+        pose.rotate((float) Math.toRadians(spinDeg));
+        pose.scale(2.2f, 2.2f);
+        pose.translate(-8, -8);
+        g.item(axeStack, 0, 0);
+        pose.popMatrix();
+    }
+
     private void drawCracks(GuiGraphicsExtractor g, int cx, int cy, int size, int count) {
         if (count <= 0) return;
         Random cr = new Random(0xC0FFEEL + count * 31L);
@@ -416,11 +331,10 @@ public class TreeGiftScreen extends Screen {
             double a = cr.nextDouble() * Math.PI * 2;
             int len = reach / 2 + cr.nextInt(reach / 2 + 1);
             int px = cx, py = cy;
-            int segs = 4;
-            for (int s = 0; s < segs; s++) {
+            for (int s = 0; s < 4; s++) {
                 double aa = a + (cr.nextDouble() - 0.5) * 0.6;
-                int nx = px + (int) (Math.cos(aa) * len / segs);
-                int ny = py + (int) (Math.sin(aa) * len / segs);
+                int nx = px + (int) (Math.cos(aa) * len / 4);
+                int ny = py + (int) (Math.sin(aa) * len / 4);
                 thickLine(g, px, py, nx, ny, 0xCC201008);
                 px = nx; py = ny;
             }
@@ -456,13 +370,10 @@ public class TreeGiftScreen extends Screen {
         }
     }
 
-    // ────────────────────────────────────────────────────────── particles
+    // ────────────────────────────────────────────── particles
 
     private static final class Particle {
-        double x, y, vx, vy;
-        long spawn, life;
-        int color;
-        float size;
+        double x, y, vx, vy; long spawn, life; int color; float size;
     }
 
     private void spawn(double x, double y, double vx, double vy, int color, long life, float size) {
@@ -498,22 +409,19 @@ public class TreeGiftScreen extends Screen {
         }
     }
 
-    // ────────────────────────────────────────────────────────── math / util
+    // ────────────────────────────────────────────── math / util
 
     private float shakeAt(long e) {
         float max = 0f;
-        for (int b = 0; b <= lastImpactHandled && b < result.steps.size(); b++) {
-            long since = e - absImpact(b);
-            if (since < 0 || since > 200) continue;
-            boolean big = result.steps.get(b).isTerminal();
-            float amt = (big ? 9f : 4f) * (1f - since / 200f);
-            if (amt > max) max = amt;
+        for (int i = 0; i < AXES; i++) {
+            long since = e - axeImpact(i);
+            if (since >= 0 && since < 200) max = Math.max(max, 5f * (1f - since / 200f));
+        }
+        long sinceBreak = e - breakMs();
+        if (sinceBreak >= 0 && sinceBreak < 220) {
+            max = Math.max(max, (6f + 5f * result.rarity.drama()) * (1f - sinceBreak / 220f));
         }
         return max;
-    }
-
-    private float flashAt(long sinceImpact) {
-        return sinceImpact < 0 ? 0f : Math.max(0f, 1f - sinceImpact / 160f);
     }
 
     private int confetti(int base) {
@@ -521,14 +429,10 @@ public class TreeGiftScreen extends Screen {
         return palette[rng.nextInt(palette.length)];
     }
 
-    private double rand(double lo, double hi) {
-        return lo + rng.nextDouble() * (hi - lo);
-    }
-
+    private double rand(double lo, double hi) { return lo + rng.nextDouble() * (hi - lo); }
     private static float clamp01(float t) { return t < 0 ? 0 : (t > 1 ? 1 : t); }
     private static float lerp(float a, float b, float t) { return a + (b - a) * t; }
     private static float easeOutCubic(float t) { float u = 1 - t; return 1 - u * u * u; }
-    private static float easeInCubic(float t) { return t * t * t; }
     private static float easeOutBack(float t) {
         float c1 = 1.70158f, c3 = c1 + 1;
         float u = t - 1;
@@ -540,23 +444,40 @@ public class TreeGiftScreen extends Screen {
         return (alpha << 24) | (argb & 0x00FFFFFF);
     }
 
-    /** Map a loot table's vanilla item id to an {@link ItemLike} (render stand-in). */
+    private static String trimPct(double d) {
+        if (d == Math.floor(d)) return String.valueOf((long) d);
+        return String.valueOf(d);
+    }
+
+    /** Vanilla render stand-in for a loot icon id (presentation only). */
     private static ItemLike itemFor(String id) {
+        if (id == null) return Items.OAK_LOG;
         switch (id) {
             case "minecraft:oak_planks":       return Items.OAK_PLANKS;
             case "minecraft:stripped_oak_log": return Items.STRIPPED_OAK_LOG;
-            case "minecraft:wheat":            return Items.WHEAT;
-            case "minecraft:bread":            return Items.BREAD;
-            case "minecraft:jungle_sapling":   return Items.JUNGLE_SAPLING;
-            case "minecraft:oak_sapling":      return Items.OAK_SAPLING;
-            case "minecraft:enchanted_book":   return Items.ENCHANTED_BOOK;
-            case "minecraft:emerald":          return Items.EMERALD;
-            case "minecraft:diamond_axe":      return Items.DIAMOND_AXE;
-            case "minecraft:iron_axe":         return Items.IRON_AXE;
-            case "minecraft:gold_ingot":       return Items.GOLD_INGOT;
-            case "minecraft:tripwire_hook":    return Items.TRIPWIRE_HOOK;
-            case "minecraft:cocoa_beans":      return Items.COCOA_BEANS;
+            case "minecraft:lime_dye":         return Items.LIME_DYE;
             case "minecraft:orange_dye":       return Items.ORANGE_DYE;
+            case "minecraft:cyan_dye":         return Items.CYAN_DYE;
+            case "minecraft:experience_bottle":return Items.EXPERIENCE_BOTTLE;
+            case "minecraft:nether_star":      return Items.NETHER_STAR;
+            case "minecraft:slime_ball":       return Items.SLIME_BALL;
+            case "minecraft:hanging_roots":    return Items.HANGING_ROOTS;
+            case "minecraft:stick":            return Items.STICK;
+            case "minecraft:enchanted_book":   return Items.ENCHANTED_BOOK;
+            case "minecraft:paper":            return Items.PAPER;
+            case "minecraft:redstone":         return Items.REDSTONE;
+            case "minecraft:golden_apple":     return Items.GOLDEN_APPLE;
+            case "minecraft:phantom_membrane": return Items.PHANTOM_MEMBRANE;
+            case "minecraft:cod":              return Items.COD;
+            case "minecraft:prismarine_shard": return Items.PRISMARINE_SHARD;
+            case "minecraft:feather":          return Items.FEATHER;
+            case "minecraft:honey_bottle":     return Items.HONEY_BOTTLE;
+            case "minecraft:blaze_powder":     return Items.BLAZE_POWDER;
+            case "minecraft:dirt":             return Items.DIRT;
+            case "minecraft:dead_bush":        return Items.DEAD_BUSH;
+            case "minecraft:snowball":         return Items.SNOWBALL;
+            case "minecraft:bone":             return Items.BONE;
+            case "minecraft:iron_axe":         return Items.IRON_AXE;
             case "minecraft:oak_log":
             default:                           return Items.OAK_LOG;
         }

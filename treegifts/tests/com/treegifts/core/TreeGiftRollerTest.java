@@ -50,8 +50,9 @@ public class TreeGiftRollerTest {
         eq(Rarity.UNCOMMON.next(), Rarity.RARE, "uncommon -> rare");
         eq(Rarity.RARE.next(), Rarity.EPIC, "rare -> epic");
         eq(Rarity.EPIC.next(), Rarity.LEGENDARY, "epic -> legendary");
-        eq(Rarity.LEGENDARY.next(), Rarity.LEGENDARY, "legendary caps at itself");
-        ok(Rarity.LEGENDARY.isMax(), "legendary isMax");
+        eq(Rarity.LEGENDARY.next(), Rarity.MYTHIC, "legendary -> mythic (ladder extended for real drops)");
+        eq(Rarity.SPECIAL.next(), Rarity.SPECIAL, "special caps at the top");
+        ok(Rarity.LEGENDARY.isMax(), "legendary isMax (legacy demo roller stops here)");
         ok(!Rarity.COMMON.isMax(), "common !isMax");
         boolean colored = true;
         for (Rarity r : Rarity.values()) if ((r.color & 0xFF000000) == 0) colored = false;

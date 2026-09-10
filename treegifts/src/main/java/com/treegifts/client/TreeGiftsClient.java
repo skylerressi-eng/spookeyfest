@@ -2,80 +2,46 @@ package com.treegifts.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import com.treegifts.TreeGiftsMod;
-import com.treegifts.core.GiftConfig;
-import com.treegifts.core.GiftResult;
-import com.treegifts.core.TreeGiftRoller;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.client.Minecraft;
-import net.minecraft.tags.BlockTags;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.Random;
-
 /**
- * The client hookup for Tree Gifts (Minecraft 26.1.2 / Fabric, Mojang mappings):
+ * Client hookup for Tree Gifts on Minecraft 26.1.2 (Fabric).
  *
- *   • Chop a log (anything in the {@code minecraft:logs} tag) → a gift reveal opens.
- *   • Press the keybind (default <b>G</b>, rebindable under Controls → Tree Gifts)
- *     → open a reveal on demand. Handy on a real server, where a client-only mod
- *     can't always see block breaks — and handy for just enjoying the animation.
+ * The reveal is driven ENTIRELY by Hypixel's real Tree Gift chat message:
+ * {@link TreeGiftChatListener} parses it and queues the actual drop, which
+ * {@link RealTreeGiftReveal} then animates. Nothing here rolls or invents loot.
  *
- * All the chance lives in {@link TreeGiftRoller}; here we just decide *when* to
- * pop a reveal and hand a freshly-rolled {@link GiftResult} to the screen.
+ * The keybind (default G) just <b>replays the last real drop</b> — handy for
+ * showing it off again — and never fabricates a result.
  */
 public class TreeGiftsClient implements ClientModInitializer {
 
-    private final GiftConfig config = GiftConfig.defaults();
-    private final TreeGiftRoller roller = new TreeGiftRoller(config, new Random());
-
-    /** Don't stack a dozen reveals when a tree drops several logs at once. */
-    private long lastOpenMs = 0L;
-    private static final long OPEN_COOLDOWN_MS = 400L;
-
-    private KeyMapping openKey;
+    private KeyMapping replayKey;
 
     @Override
     public void onInitializeClient() {
-        // 26.x: KeyMapping takes a KeyMapping.Category object (not a String).
-        openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.treegifts.open",
+        // The one and only trigger: real Tree Gift chat messages.
+        new TreeGiftChatListener().register();
+
+        replayKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.treegifts.replay",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_G,
                 KeyMapping.Category.MISC));
 
-        // Keybind: open a reveal whenever the player asks.
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (openKey.consumeClick()) {
-                openGift(client);
+            while (replayKey.consumeClick()) {
+                if (!RealTreeGiftReveal.INSTANCE.replayLast()) {
+                    TreeGiftsMod.LOGGER.info("[Tree Gifts] no real Tree Gift seen yet — chop a tree on Galatea first.");
+                }
             }
         });
 
-        // Chop a log → open a reveal. Fires in singleplayer / on an integrated
-        // server; on a remote server use the keybind instead.
-        PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) -> {
-            Minecraft client = Minecraft.getInstance();
-            if (client.player == null || player != client.player) return;
-            if (!state.is(BlockTags.LOGS)) return;
-            openGift(client);
-        });
-
-        TreeGiftsMod.LOGGER.info("[Tree Gifts] client ready — keybind: G");
-    }
-
-    /** Roll a gift and show the reveal, unless one is already up or we're on cooldown. */
-    private void openGift(Minecraft client) {
-        long now = System.currentTimeMillis();
-        if (now - lastOpenMs < OPEN_COOLDOWN_MS) return;
-        if (client.screen instanceof TreeGiftScreen) return;
-        lastOpenMs = now;
-
-        final GiftResult result = roller.roll();
-        // Screens must be opened on the client thread.
-        client.execute(() -> client.setScreen(new TreeGiftScreen(result)));
+        TreeGiftsMod.LOGGER.info("[Tree Gifts] client ready — watching chat for real Tree Gifts. Replay key: G");
     }
 }
