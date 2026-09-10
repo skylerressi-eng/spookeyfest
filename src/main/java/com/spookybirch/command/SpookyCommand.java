@@ -8,6 +8,8 @@ import com.spookybirch.data.CandyData;
 import com.spookybirch.data.CandyMob;
 import com.spookybirch.data.FishingData;
 import com.spookybirch.data.SeaCreature;
+import com.spookybirch.dragon.data.DragonType;
+import com.spookybirch.dragon.gui.DragonRouletteScreen;
 import com.spookybirch.gui.GuideScreen;
 import com.spookybirch.gui.MoveHudScreen;
 
@@ -36,7 +38,7 @@ import java.util.List;
 public class SpookyCommand extends CommandBase {
 
     private static final String[] SUBS = {
-            "guide", "stats", "goal", "candy", "fishing", "move", "toggle", "reset"
+            "guide", "dragon", "stats", "goal", "candy", "fishing", "move", "toggle", "reset"
     };
 
     @Override
@@ -50,7 +52,17 @@ public class SpookyCommand extends CommandBase {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args, SUBS);
         }
+        if (args.length == 2 && args[0].equalsIgnoreCase("dragon")) {
+            return getListOfStringsMatchingLastWord(args, dragonNames());
+        }
         return null;
+    }
+
+    private static String[] dragonNames() {
+        DragonType[] types = DragonType.values();
+        String[] names = new String[types.length];
+        for (int i = 0; i < types.length; i++) names[i] = types[i].name().toLowerCase();
+        return names;
     }
 
     @Override
@@ -60,7 +72,7 @@ public class SpookyCommand extends CommandBase {
 
     @Override
     public String getCommandUsage(ICommandSender sender) {
-        return "/spooky <guide|stats|goal|candy|fishing|move|toggle|reset>";
+        return "/spooky <guide|dragon|stats|goal|candy|fishing|move|toggle|reset>";
     }
 
     @Override
@@ -82,6 +94,8 @@ public class SpookyCommand extends CommandBase {
             mc.addScheduledTask(new Runnable() {
                 public void run() { mc.displayGuiScreen(new GuideScreen()); }
             });
+        } else if (sub.equals("dragon") || sub.equals("roulette")) {
+            openRoulette(sender, mc, args);
         } else if (sub.equals("move")) {
             mc.addScheduledTask(new Runnable() {
                 public void run() { mc.displayGuiScreen(new MoveHudScreen()); }
@@ -106,9 +120,35 @@ public class SpookyCommand extends CommandBase {
         }
     }
 
+    /** Open the Dragon Altar Roulette, optionally on a named dragon. */
+    private void openRoulette(ICommandSender s, final Minecraft mc, String[] args) {
+        DragonType type = DragonType.SUPERIOR;
+        if (args.length >= 2) {
+            DragonType parsed = parseDragon(args[1]);
+            if (parsed == null) {
+                msg(s, EnumChatFormatting.RED + "Unknown dragon: " + args[1]
+                        + EnumChatFormatting.GRAY + " (protector, old, wise, young, strong, unstable, superior, holy)");
+                return;
+            }
+            type = parsed;
+        }
+        final DragonType chosen = type;
+        mc.addScheduledTask(new Runnable() {
+            public void run() { mc.displayGuiScreen(new DragonRouletteScreen(chosen)); }
+        });
+    }
+
+    private static DragonType parseDragon(String name) {
+        for (DragonType t : DragonType.values()) {
+            if (t.name().equalsIgnoreCase(name) || t.display.equalsIgnoreCase(name)) return t;
+        }
+        return null;
+    }
+
     private void printHelp(ICommandSender s) {
         msg(s, EnumChatFormatting.GOLD + "" + EnumChatFormatting.BOLD + "☠ SpookyBirch");
         msg(s, EnumChatFormatting.YELLOW + "/spooky guide " + EnumChatFormatting.GRAY + "- candy + fishing tables");
+        msg(s, EnumChatFormatting.YELLOW + "/spooky dragon [type] " + EnumChatFormatting.GRAY + "- Dragon Altar Roulette (visual sim)");
         msg(s, EnumChatFormatting.YELLOW + "/spooky candy " + EnumChatFormatting.GRAY + "- best candy mobs in chat");
         msg(s, EnumChatFormatting.YELLOW + "/spooky fishing " + EnumChatFormatting.GRAY + "- spooky sea creatures");
         msg(s, EnumChatFormatting.YELLOW + "/spooky stats " + EnumChatFormatting.GRAY + "- candy score, rate & ETA");

@@ -52,6 +52,7 @@ Reset a session with **`/spooky reset`**.
 |---------|------|
 | `/spooky` | Show help |
 | `/spooky guide` | Open the score + candy + fishing GUI (3 tabs) |
+| `/spooky dragon [type]` | Open the **Dragon Altar Roulette** (visual sim), optionally on a named dragon |
 | `/spooky stats` | Print your candy score, rate & ETA to chat |
 | _(tab-complete)_ | Press Tab after `/spooky ` to cycle sub-commands |
 | `/spooky goal <n>` | Set a candy-score goal for the ETA (`0` turns it off) |
@@ -61,8 +62,48 @@ Reset a session with **`/spooky reset`**.
 | `/spooky toggle` | Show/hide the HUD |
 | `/spooky reset` | Reset the session candy counters + rates |
 
-Aliases: `/spookybirch`, `/sb`. There's also a keybind (**default `G`**,
-rebindable under Controls → SpookyBirch) that opens the guide.
+Aliases: `/spookybirch`, `/sb`. Two keybinds (rebindable under Controls →
+SpookyBirch): **`G`** opens the guide, **`K`** opens the Dragon Altar Roulette.
+
+## Dragon Altar Roulette
+
+A polished, **cosmetic-only** visualisation of Hypixel SkyBlock's Ender Dragon
+loot. Open it with **`/spooky dragon`** or the **`K`** keybind. A fantasy
+roulette wheel shows a dragon's loot pool as rarity-coloured segments; a ball
+accelerates, cruises, decelerates and bounces into a pocket, then a result card
+reveals what it landed on with rarity-scaled glow, particles and sound.
+
+> 🚫 **This is a visual simulation — not gambling.** It never risks or awards
+> coins/items, never reads or modifies your inventory, never touches the
+> economy, and never automates gameplay. Every result is explicitly labelled
+> *"Simulation result — visual only"*. It's a fancy loot-table viewer, nothing
+> more — so it can't get you banned and gives no gameplay advantage.
+
+**Controls:** `SPACE`/click spin · `R` replay · `←`/`→` change dragon · `ESC`
+close · `[` `]` eyes · `-` `=` damage rank · `F` final blow.
+
+**Dragons:** all seven summonable Ender Dragons — Protector, Old, Wise, Young,
+Strong, Unstable, Superior — plus **Holy** shown as a *reference* pool (Holy
+armour is a Catacombs drop, **not** a dragon fight, so the sim refuses to
+"summon" it).
+
+**What's real vs. simulated:**
+
+- **Real, researched data:** each dragon's loot pool, item rarities, the
+  verified **Dragon Weight** requirements (Helmet 325, Leggings 350,
+  Chestplate 400, Boots 300, AOTD/Claw/Horn/Scale/Pet 450, Travel Scroll 250)
+  and the game's own drop-note wording (AOTD `0-24%`, Pet `0-0.4%`/`0-0.08%`,
+  armour `30%`, etc.). The Weight-sim panel computes eligibility with the real
+  formula (+100/eye, damage-rank brackets, +50 final blow).
+- **Not faked:** the wheel spin is a **fair, uniform** draw, *not* weighted by
+  real drop odds — because those odds aren't published as simple percentages
+  (they're governed by the Weight/quality system). Inventing them would be
+  faking accuracy, so unverifiable values show as `UNKNOWN`.
+
+Source: the community-maintained Hypixel SkyBlock Wiki
+(`hypixelskyblock.minecraft.wiki`), the maintained successor after the official
+`wiki.hypixel.net` was retired in July 2026. Loot lives in one place —
+`dragon/data/DragonLootData.java` — so it's easy to update.
 
 ## Which mobs give the most candy
 
@@ -136,6 +177,14 @@ PASSED: 42   FAILED: 0
 `CandyTracker` is deliberately decoupled from Forge (config values are pushed in,
 and its clock is injectable) which is what makes this testable.
 
+The **Dragon Altar Roulette** core is decoupled the same way — its data, weight
+model, simulator and animation state machine have no Minecraft imports — so
+`run-tests.sh` also runs `DragonSimTest`: **21,158** checks covering loot-data
+integrity, the verified weight requirements, the weight formula and clamps,
+deterministic seeding, and — the important one — that the animation lands the
+ball **exactly** on the chosen segment under the pointer across 60 seeds in both
+normal and reduced-motion modes. Only the rendering/GUI layer needs Forge.
+
 ## Tuning the data
 
 All the numbers live in two files and nothing else references game constants:
@@ -158,6 +207,12 @@ com.spookybirch
 ├── gui/                 MoveHudScreen (drag/scale) + GuideScreen (score + reference)
 ├── command/             /spooky command
 ├── data/                CandyData / FishingData reference tables
+├── dragon/              Dragon Altar Roulette (cosmetic simulation)
+│   ├── data/            DragonType, LootRarity, LootEntry, DragonLoot,
+│   │                    DragonLootData (verified pools), DragonWeight
+│   ├── sim/             AnimationState, Easing, RouletteSimulator,
+│   │                    RouletteAnimator (state machine + exact landing)
+│   └── gui/             DragonRouletteScreen, WheelRenderer, DrawUtil
 └── util/                scoreboard, text parsing + Fmt (number/time formatting)
 ```
 

@@ -2,7 +2,7 @@
   {
     "modid": "spookybirch",
     "name": "SpookyBirch",
-    "description": "A Birch-style overlay for the Hypixel SkyBlock Spooky Festival. Shows mana, candy tracking, nearby spooky mobs, best candy mobs, and spooky fishing sea creatures.",
+    "description": "A Birch-style overlay for the Hypixel SkyBlock Spooky Festival. Shows mana, candy tracking, nearby spooky mobs, best candy mobs, and spooky fishing sea creatures. Also includes the Dragon Altar Roulette: a cosmetic, simulation-only visualisation of Ender Dragon loot pools and Dragon Weight (no gambling, no economy, no automation).",
     "version": "${version}",
     "mcversion": "${mcversion}",
     "url": "https://github.com/skylerressi-eng/spookeyfest",

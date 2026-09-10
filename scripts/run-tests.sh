@@ -16,3 +16,12 @@ javac -d "$OUT" \
   tests/com/spookybirch/core/StressTest.java
 
 java -cp "$OUT" com.spookybirch.core.StressTest
+
+# Dragon Altar Roulette core (loot data, weight model, simulator, animation
+# state machine + exact-landing maths) — also Forge-free, so it runs here too.
+javac -d "$OUT" \
+  src/main/java/com/spookybirch/dragon/data/*.java \
+  src/main/java/com/spookybirch/dragon/sim/*.java \
+  tests/com/spookybirch/dragon/DragonSimTest.java
+
+java -cp "$OUT" com.spookybirch.dragon.DragonSimTest

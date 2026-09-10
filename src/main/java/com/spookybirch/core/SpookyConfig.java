@@ -33,6 +33,16 @@ public final class SpookyConfig {
     public int hudY = 5;
     public float hudScale = 1.0f;
 
+    // --- Dragon Altar Roulette (cosmetic simulation) ---
+    public double dragonAnimSpeed = 1.0;        // spin speed multiplier
+    public double dragonParticleIntensity = 1.0; // reveal particle amount
+    public boolean dragonSound = true;          // reveal sound effects
+    public boolean dragonRareEffects = true;    // extra glow/pulse for rare results
+    public double dragonWheelScale = 1.0;       // wheel size multiplier
+    public boolean dragonShowWeights = true;    // show Dragon Weight requirements
+    public boolean dragonShowPercents = true;   // show drop-note text
+    public boolean dragonReducedMotion = false; // shorter, calmer animation
+
     public void load(File dir) {
         File file = new File(dir, "spookybirch.cfg");
         cfg = new Configuration(file);
@@ -55,6 +65,15 @@ public final class SpookyConfig {
         hudX     = cfg.getInt("hudX", "position", 5, 0, 10000, "HUD x pixel");
         hudY     = cfg.getInt("hudY", "position", 5, 0, 10000, "HUD y pixel");
         hudScale = (float) cfg.get("position", "hudScale", 1.0D, "HUD scale", 0.5D, 2.5D).getDouble();
+
+        dragonAnimSpeed        = cfg.get("dragon", "animSpeed", 1.0D, "Roulette spin speed multiplier", 0.25D, 3.0D).getDouble();
+        dragonParticleIntensity= cfg.get("dragon", "particleIntensity", 1.0D, "Reveal particle amount", 0.0D, 2.0D).getDouble();
+        dragonSound            = cfg.getBoolean("dragonSound", "dragon", true, "Play the result reveal sound");
+        dragonRareEffects      = cfg.getBoolean("dragonRareEffects", "dragon", true, "Extra glow/pulse for rare results");
+        dragonWheelScale       = cfg.get("dragon", "wheelScale", 1.0D, "Roulette wheel size multiplier", 0.5D, 2.0D).getDouble();
+        dragonShowWeights      = cfg.getBoolean("dragonShowWeights", "dragon", true, "Show Dragon Weight requirements");
+        dragonShowPercents     = cfg.getBoolean("dragonShowPercents", "dragon", true, "Show drop-note text");
+        dragonReducedMotion    = cfg.getBoolean("dragonReducedMotion", "dragon", false, "Shorter, calmer animation");
         if (cfg.hasChanged()) cfg.save();
         applyToTracker();
     }
@@ -82,6 +101,14 @@ public final class SpookyConfig {
         cfg.get("position", "hudX", 5).set(hudX);
         cfg.get("position", "hudY", 5).set(hudY);
         cfg.get("position", "hudScale", 1.0D).set((double) hudScale);
+        cfg.get("dragon", "animSpeed", 1.0D).set(dragonAnimSpeed);
+        cfg.get("dragon", "particleIntensity", 1.0D).set(dragonParticleIntensity);
+        cfg.get("dragon", "dragonSound", true).set(dragonSound);
+        cfg.get("dragon", "dragonRareEffects", true).set(dragonRareEffects);
+        cfg.get("dragon", "wheelScale", 1.0D).set(dragonWheelScale);
+        cfg.get("dragon", "dragonShowWeights", true).set(dragonShowWeights);
+        cfg.get("dragon", "dragonShowPercents", true).set(dragonShowPercents);
+        cfg.get("dragon", "dragonReducedMotion", false).set(dragonReducedMotion);
         cfg.save();
     }
 
