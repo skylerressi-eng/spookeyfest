@@ -24,7 +24,7 @@ public class SpookyBirch {
 
     public static final String MODID = "spookybirch";
     public static final String NAME = "SpookyBirch";
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = "26.1.2";
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
