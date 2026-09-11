@@ -46,6 +46,42 @@ From that it works out:
 See it all live in **`/spooky stats`** or the **My Score** tab of `/spooky guide`.
 Reset a session with **`/spooky reset`**.
 
+## ⚒ Blacksmith reforge gamble (cinematic)
+
+A dramatic, **purely visual** overlay for the normal SkyBlock **Apply Reforge**
+action. When you reforge an item at the Blacksmith, the mod plays a three-hit
+anvil cinematic that flashes through believable fake reforges and then **lands on
+the exact reforge Hypixel actually applied**, before the anvil cracks, shatters
+and reveals the result.
+
+> **The server stays authoritative.** The mod never invents a reforge, never
+> sends a packet, never touches your coins or inventory. It reads the real result
+> back from the item's NBT (`ExtraAttributes.modifier`) and the animation *ends*
+> on it — it never decides it. If the result can't be confirmed (you close the
+> GUI, the reforge fails, you can't afford it), **no reveal is shown**.
+
+- **Item-aware fakes** — the two intermediate reforges are pulled from the
+  *current* basic-Blacksmith pool for that item's category (sword, bow, armor,
+  equipment, axe, hoe, pickaxe). See [`docs/REFORGES.md`](docs/REFORGES.md) for
+  the full researched data (Sept 2026, community wiki fork).
+- **Three hits** — clang, clang, then a heavy finale; sparks, screen shake, the
+  anvil cracks and breaks into fragments, then the real reforge glows in.
+- **No assets** — the whole thing is drawn with GL primitives, so there's nothing
+  to ship and it runs identically on any 1.8.9 client.
+
+Configure or preview it:
+
+| Command | Does |
+|---------|------|
+| `/spooky reforge` | Show status |
+| `/spooky reforge test` | Play a preview (random reforges — not a real item) |
+| `/spooky reforge on` / `off` | Toggle the cinematic |
+| `/spooky reforge sounds` | Toggle anvil sounds |
+| `/spooky reforge motion` | Toggle reduced motion (less shake/particles, shorter) |
+| `/spooky reforge speed <0.5–3.0>` | Animation speed |
+
+All of these persist in `config/spookybirch.cfg` under the `reforge` section.
+
 ## Commands
 
 | Command | Does |
@@ -57,6 +93,7 @@ Reset a session with **`/spooky reset`**.
 | `/spooky goal <n>` | Set a candy-score goal for the ETA (`0` turns it off) |
 | `/spooky candy` | Print the best-candy-mob ranking to chat |
 | `/spooky fishing` | Print the spooky sea-creature table to chat |
+| `/spooky reforge` | Blacksmith reforge cinematic — status / `test` / `on` / `off` / `sounds` / `motion` / `speed <n>` |
 | `/spooky move` | Drag the HUD around, scroll to scale, Esc to save |
 | `/spooky toggle` | Show/hide the HUD |
 | `/spooky reset` | Reset the session candy counters + rates |
@@ -133,8 +170,16 @@ math, reset behaviour, and that the rate window stays memory-bounded. All green:
 PASSED: 42   FAILED: 0
 ```
 
-`CandyTracker` is deliberately decoupled from Forge (config values are pushed in,
-and its clock is injectable) which is what makes this testable.
+The reforge cinematic's core logic is decoupled the same way: `ReforgeAnimation`
+is pure Java (no Minecraft imports), so the suite also drives it to completion
+hundreds of times and asserts the invariant that matters most — **the reveal is
+always the real result it was handed, never an intermediate fake** — plus stage
+monotonicity, one-shot hit/break/reveal timing, and that degenerate reforge pools
+never hang.
+
+`CandyTracker` and `ReforgeAnimation` are deliberately decoupled from Forge
+(config values are pushed in, clocks/time are injected) which is what makes this
+testable.
 
 ## Tuning the data
 
@@ -155,6 +200,9 @@ com.spookybirch
 │                        CandyTracker (score / rate / ETA engine)
 ├── event/               StateUpdater (fills state each tick) + KeyBinds
 ├── hud/                 SpookyHud (the corner overlay)
+├── reforge/             Blacksmith reforge cinematic — ReforgeData (pools),
+│                        ReforgeAnimation (Forge-free state machine),
+│                        ReforgeGambleRenderer (GL draw), ReforgeGambleHandler (detect)
 ├── gui/                 MoveHudScreen (drag/scale) + GuideScreen (score + reference)
 ├── command/             /spooky command
 ├── data/                CandyData / FishingData reference tables

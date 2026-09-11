@@ -5,6 +5,7 @@ import com.spookybirch.core.SpookyConfig;
 import com.spookybirch.event.KeyBinds;
 import com.spookybirch.event.StateUpdater;
 import com.spookybirch.hud.SpookyHud;
+import com.spookybirch.reforge.ReforgeGambleHandler;
 
 import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.common.MinecraftForge;
@@ -36,6 +37,7 @@ public class SpookyBirch {
         MinecraftForge.EVENT_BUS.register(new StateUpdater());
         MinecraftForge.EVENT_BUS.register(new SpookyHud());
         MinecraftForge.EVENT_BUS.register(new KeyBinds());
+        MinecraftForge.EVENT_BUS.register(new ReforgeGambleHandler());
         ClientCommandHandler.instance.registerCommand(new SpookyCommand());
     }
 }

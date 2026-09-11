@@ -13,6 +13,9 @@ javac -d "$OUT" \
   src/main/java/com/spookybirch/util/Fmt.java \
   src/main/java/com/spookybirch/util/TextUtil.java \
   src/main/java/com/spookybirch/data/*.java \
-  tests/com/spookybirch/core/StressTest.java
+  src/main/java/com/spookybirch/reforge/ReforgeAnimation.java \
+  tests/com/spookybirch/core/StressTest.java \
+  tests/com/spookybirch/reforge/ReforgeAnimationTest.java
 
 java -cp "$OUT" com.spookybirch.core.StressTest
+java -cp "$OUT" com.spookybirch.reforge.ReforgeAnimationTest

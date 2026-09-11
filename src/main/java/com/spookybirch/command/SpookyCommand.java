@@ -10,6 +10,7 @@ import com.spookybirch.data.FishingData;
 import com.spookybirch.data.SeaCreature;
 import com.spookybirch.gui.GuideScreen;
 import com.spookybirch.gui.MoveHudScreen;
+import com.spookybirch.reforge.ReforgeGambleHandler;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.command.CommandBase;
@@ -36,7 +37,11 @@ import java.util.List;
 public class SpookyCommand extends CommandBase {
 
     private static final String[] SUBS = {
-            "guide", "stats", "goal", "candy", "fishing", "move", "toggle", "reset"
+            "guide", "stats", "goal", "candy", "fishing", "move", "toggle", "reset", "reforge"
+    };
+
+    private static final String[] REFORGE_SUBS = {
+            "on", "off", "sounds", "motion", "speed", "test"
     };
 
     @Override
@@ -49,6 +54,9 @@ public class SpookyCommand extends CommandBase {
     public List<String> addTabCompletionOptions(ICommandSender sender, String[] args, BlockPos pos) {
         if (args.length == 1) {
             return getListOfStringsMatchingLastWord(args, SUBS);
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("reforge")) {
+            return getListOfStringsMatchingLastWord(args, REFORGE_SUBS);
         }
         return null;
     }
@@ -101,6 +109,8 @@ public class SpookyCommand extends CommandBase {
         } else if (sub.equals("reset")) {
             SpookyState.INSTANCE.resetSession();
             msg(sender, EnumChatFormatting.GOLD + "Session candy counters reset.");
+        } else if (sub.equals("reforge")) {
+            handleReforge(sender, args);
         } else {
             printHelp(sender);
         }
@@ -113,6 +123,7 @@ public class SpookyCommand extends CommandBase {
         msg(s, EnumChatFormatting.YELLOW + "/spooky fishing " + EnumChatFormatting.GRAY + "- spooky sea creatures");
         msg(s, EnumChatFormatting.YELLOW + "/spooky stats " + EnumChatFormatting.GRAY + "- candy score, rate & ETA");
         msg(s, EnumChatFormatting.YELLOW + "/spooky goal <n> " + EnumChatFormatting.GRAY + "- set a candy-score goal (0=off)");
+        msg(s, EnumChatFormatting.YELLOW + "/spooky reforge " + EnumChatFormatting.GRAY + "- Blacksmith reforge cinematic (test/on/off)");
         msg(s, EnumChatFormatting.YELLOW + "/spooky move " + EnumChatFormatting.GRAY + "- drag the HUD around");
         msg(s, EnumChatFormatting.YELLOW + "/spooky toggle " + EnumChatFormatting.GRAY + "- show/hide the HUD");
         msg(s, EnumChatFormatting.YELLOW + "/spooky reset " + EnumChatFormatting.GRAY + "- reset session candy");
@@ -150,6 +161,49 @@ public class SpookyCommand extends CommandBase {
             msg(s, EnumChatFormatting.GOLD + (goal == 0 ? "Candy goal cleared." : "Candy goal set to " + Fmt.num(goal) + "."));
         } catch (NumberFormatException e) {
             msg(s, EnumChatFormatting.RED + "That's not a number: " + args[1]);
+        }
+    }
+
+    private void handleReforge(ICommandSender s, String[] args) {
+        final SpookyConfig cfg = SpookyConfig.INSTANCE;
+        String sub = args.length < 2 ? "" : args[1].toLowerCase();
+
+        if (sub.equals("on") || sub.equals("off")) {
+            cfg.reforgeEnabled = sub.equals("on");
+            cfg.save();
+            msg(s, EnumChatFormatting.GOLD + "Reforge cinematic " + (cfg.reforgeEnabled ? "enabled" : "disabled") + ".");
+        } else if (sub.equals("sounds")) {
+            cfg.reforgeSounds = !cfg.reforgeSounds;
+            cfg.save();
+            msg(s, EnumChatFormatting.GOLD + "Reforge sounds " + (cfg.reforgeSounds ? "on" : "off") + ".");
+        } else if (sub.equals("motion")) {
+            cfg.reforgeReducedMotion = !cfg.reforgeReducedMotion;
+            cfg.save();
+            msg(s, EnumChatFormatting.GOLD + "Reduced motion " + (cfg.reforgeReducedMotion ? "on" : "off") + ".");
+        } else if (sub.equals("speed")) {
+            if (args.length < 3) { msg(s, EnumChatFormatting.RED + "Usage: /spooky reforge speed <0.5-3.0>"); return; }
+            try {
+                double v = Double.parseDouble(args[2]);
+                if (v < 0.5) v = 0.5; if (v > 3.0) v = 3.0;
+                cfg.reforgeSpeed = v;
+                cfg.save();
+                msg(s, EnumChatFormatting.GOLD + "Reforge animation speed set to ×" + v + ".");
+            } catch (NumberFormatException e) {
+                msg(s, EnumChatFormatting.RED + "That's not a number: " + args[2]);
+            }
+        } else if (sub.equals("test") || sub.equals("demo")) {
+            if (ReforgeGambleHandler.INSTANCE != null) {
+                ReforgeGambleHandler.INSTANCE.playDemo();
+                msg(s, EnumChatFormatting.GOLD + "Playing a reforge cinematic preview (random reforges — not a real item).");
+            }
+        } else {
+            msg(s, EnumChatFormatting.GOLD + "" + EnumChatFormatting.BOLD + "⚒ Reforge gamble");
+            msg(s, EnumChatFormatting.GRAY + "Cinematic 3-hit anvil animation over the Blacksmith's Apply Reforge.");
+            msg(s, EnumChatFormatting.GRAY + "State: " + (cfg.reforgeEnabled ? EnumChatFormatting.GREEN + "on" : EnumChatFormatting.RED + "off")
+                    + EnumChatFormatting.GRAY + "  •  sounds " + (cfg.reforgeSounds ? "on" : "off")
+                    + "  •  reduced motion " + (cfg.reforgeReducedMotion ? "on" : "off")
+                    + "  •  speed ×" + cfg.reforgeSpeed);
+            msg(s, EnumChatFormatting.YELLOW + "/spooky reforge on|off|sounds|motion|speed <n>|test");
         }
     }
 

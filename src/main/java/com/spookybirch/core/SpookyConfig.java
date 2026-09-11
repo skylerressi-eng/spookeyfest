@@ -33,6 +33,12 @@ public final class SpookyConfig {
     public int hudY = 5;
     public float hudScale = 1.0f;
 
+    // --- Blacksmith reforge gamble (cinematic overlay on Apply Reforge) ---
+    public boolean reforgeEnabled = true;        // master toggle for the cinematic
+    public boolean reforgeSounds = true;         // hit / break / reveal sounds
+    public boolean reforgeReducedMotion = false; // less shake, fewer particles, shorter
+    public double reforgeSpeed = 1.0;            // >1 faster, <1 slower
+
     public void load(File dir) {
         File file = new File(dir, "spookybirch.cfg");
         cfg = new Configuration(file);
@@ -52,6 +58,10 @@ public final class SpookyConfig {
         onlyDuringFestival = cfg.getBoolean("onlyDuringFestival", "hud", false, "Only show HUD while the fest is live");
         purpleWeight = cfg.get("score", "purpleWeight", 8.0D, "Score value of one purple candy (green = 1)", 1.0D, 100.0D).getDouble();
         candyGoal    = cfg.getInt("candyGoal", "score", 0, 0, 10_000_000, "Candy score goal for ETA (0 = off)");
+        reforgeEnabled       = cfg.getBoolean("reforgeEnabled", "reforge", true, "Play the cinematic anvil animation on Apply Reforge");
+        reforgeSounds        = cfg.getBoolean("reforgeSounds", "reforge", true, "Play anvil hit/break/reveal sounds");
+        reforgeReducedMotion = cfg.getBoolean("reforgeReducedMotion", "reforge", false, "Reduce shake/particles and shorten the animation");
+        reforgeSpeed         = cfg.get("reforge", "reforgeSpeed", 1.0D, "Animation speed multiplier (2 = twice as fast)", 0.5D, 3.0D).getDouble();
         hudX     = cfg.getInt("hudX", "position", 5, 0, 10000, "HUD x pixel");
         hudY     = cfg.getInt("hudY", "position", 5, 0, 10000, "HUD y pixel");
         hudScale = (float) cfg.get("position", "hudScale", 1.0D, "HUD scale", 0.5D, 2.5D).getDouble();
@@ -78,6 +88,10 @@ public final class SpookyConfig {
         cfg.get("hud", "onlyDuringFestival", false).set(onlyDuringFestival);
         cfg.get("score", "purpleWeight", 8.0D).set(purpleWeight);
         cfg.get("score", "candyGoal", 0).set(candyGoal);
+        cfg.get("reforge", "reforgeEnabled", true).set(reforgeEnabled);
+        cfg.get("reforge", "reforgeSounds", true).set(reforgeSounds);
+        cfg.get("reforge", "reforgeReducedMotion", false).set(reforgeReducedMotion);
+        cfg.get("reforge", "reforgeSpeed", 1.0D).set(reforgeSpeed);
         applyToTracker();
         cfg.get("position", "hudX", 5).set(hudX);
         cfg.get("position", "hudY", 5).set(hudY);
