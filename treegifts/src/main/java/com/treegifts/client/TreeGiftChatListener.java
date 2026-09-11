@@ -2,7 +2,9 @@ package com.treegifts.client;
 
 import com.treegifts.TreeGiftsMod;
 import com.treegifts.core.TreeGiftChatParser;
+import com.treegifts.core.TreeGiftConfig;
 import com.treegifts.core.TreeGiftResult;
+import com.treegifts.core.TreeGiftStats;
 
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.minecraft.ChatFormatting;
@@ -84,10 +86,14 @@ public final class TreeGiftChatListener {
         lastSignature = sig;
         lastSignatureTime = now;
 
+        TreeGiftConfig cfg = TreeGiftConfig.INSTANCE;
         for (TreeGiftResult r : emitted) {
-            TreeGiftsMod.LOGGER.info("[Tree Gifts] real drop revealed: {}", r);
-            RealTreeGiftReveal.INSTANCE.enqueue(r);
+            TreeGiftStats.INSTANCE.record(r);
+            boolean show = cfg.autoReveal && r.rarity.ordinal() >= cfg.minRarity;
+            TreeGiftsMod.LOGGER.info("[Tree Gifts] real drop: {} ({})", r, show ? "revealing" : "below threshold, logged only");
+            if (show) RealTreeGiftReveal.INSTANCE.enqueue(r);
         }
+        cfg.saveStats();
     }
 
     /** Collect the §-text of every SHOW_TEXT hover in the message's component tree. */

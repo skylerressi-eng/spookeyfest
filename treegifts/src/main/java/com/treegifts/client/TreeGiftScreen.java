@@ -1,7 +1,9 @@
 package com.treegifts.client;
 
 import com.treegifts.core.Rarity;
+import com.treegifts.core.TreeGiftConfig;
 import com.treegifts.core.TreeGiftResult;
+import com.treegifts.core.TreeGiftStats;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -64,6 +66,12 @@ public class TreeGiftScreen extends Screen {
     private long skipToMs = -1;
     private boolean closed = false;
 
+    // Config-driven feel.
+    private final double animSpeed;
+    private final double particleScale;
+    private final boolean sounds;
+    private final long giftNumber;
+
     public TreeGiftScreen(TreeGiftResult result) {
         super(Component.literal("Tree Gift"));
         this.result = result;
@@ -71,6 +79,11 @@ public class TreeGiftScreen extends Screen {
         this.axeStack = new ItemStack(Items.IRON_AXE);
         this.rewardStack = new ItemStack(itemFor(result.iconItemId));
         if (result.hasAmount()) rewardStack.setCount(Math.max(1, Math.min(64, result.amount)));
+        TreeGiftConfig cfg = TreeGiftConfig.INSTANCE;
+        this.animSpeed = cfg.animationSpeed <= 0 ? 1.0 : cfg.animationSpeed;
+        this.particleScale = cfg.particleScale;
+        this.sounds = cfg.playSounds;
+        this.giftNumber = TreeGiftStats.INSTANCE.total();
     }
 
     // ────────────────────────────────────────────── timeline helpers
@@ -80,7 +93,7 @@ public class TreeGiftScreen extends Screen {
     private static long now() { return System.currentTimeMillis(); }
 
     private long elapsed() {
-        long e = now() - startMs;
+        long e = (long) ((now() - startMs) * animSpeed); // animationSpeed scales the whole reveal
         return skipToMs >= 0 ? Math.max(e, skipToMs) : e;
     }
 
@@ -162,7 +175,17 @@ public class TreeGiftScreen extends Screen {
         renderParticles(g);
         pose.popMatrix();
 
+        drawFlash(g, e);
         renderHud(g, e, reveal);
+    }
+
+    /** A bright full-screen flash the instant a Legendary+ wood breaks open. */
+    private void drawFlash(GuiGraphicsExtractor g, long e) {
+        if (result.rarity.ordinal() < Rarity.LEGENDARY.ordinal()) return;
+        long since = e - breakMs();
+        if (since < 0 || since > 300) return;
+        float a = 0.75f * (1f - since / 300f);
+        g.fill(0, 0, width, height, withAlpha(0xFFFFFFFF, a));
     }
 
     private void renderIntro(GuiGraphicsExtractor g, int cx, int cy, float t) {
@@ -223,7 +246,7 @@ public class TreeGiftScreen extends Screen {
         if (!finaleBurstDone) {
             finaleBurstDone = true;
             playFinaleSound();
-            int n = (int) (25 + 90 * drama);
+            int n = (int) ((25 + 90 * drama) * particleScale);
             for (int i = 0; i < n; i++) {
                 spawn(cx, cy, rand(-120, 120), rand(-170, -20), confetti(color), 900 + rng.nextInt(800), 3f);
             }
@@ -241,6 +264,9 @@ public class TreeGiftScreen extends Screen {
         g.centeredText(font, "TREE GIFT", width / 2, top, 0xFFFFD24A);
         if (!result.treeType.isEmpty()) {
             g.centeredText(font, result.treeType + " Tree", width / 2, top + 12, 0xFF9BE8A0);
+        }
+        if (giftNumber > 0) {
+            g.centeredText(font, "Gift #" + giftNumber, width / 2, top + 24, 0xFF6D6D6D);
         }
 
         if (reveal && e >= breakMs() + SPLIT_MS) {
@@ -286,6 +312,7 @@ public class TreeGiftScreen extends Screen {
     }
 
     private void playSound(SoundEvent event, float pitch) {
+        if (!sounds) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc != null && mc.getSoundManager() != null) {
             mc.getSoundManager().play(SimpleSoundInstance.forUI(event, pitch));
@@ -384,7 +411,8 @@ public class TreeGiftScreen extends Screen {
     }
 
     private void burst(int cx, int cy, int n, int color, double speed) {
-        for (int i = 0; i < n; i++) {
+        int count = Math.max(1, (int) Math.round(n * particleScale));
+        for (int i = 0; i < count; i++) {
             double a = rng.nextDouble() * Math.PI * 2;
             double sp = speed * (0.3 + rng.nextDouble());
             spawn(cx, cy, Math.cos(a) * sp, Math.sin(a) * sp - 20, color, 500 + rng.nextInt(500), 2.5f);

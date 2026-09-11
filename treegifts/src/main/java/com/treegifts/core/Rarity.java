@@ -65,4 +65,20 @@ public enum Rarity {
     public float drama() {
         return ordinal() / (float) (values().length - 1);
     }
+
+    /** The display name prefixed with this rarity's legacy colour code. */
+    public String colored() {
+        return "§" + code + display;
+    }
+
+    /** Parse a rarity from a name/code (case-insensitive); null if unrecognised. */
+    public static Rarity fromName(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        for (Rarity r : values()) {
+            if (r.name().equalsIgnoreCase(t) || r.display.equalsIgnoreCase(t)) return r;
+        }
+        if (t.length() == 1) return fromColorCode(t.charAt(0));
+        return null;
+    }
 }

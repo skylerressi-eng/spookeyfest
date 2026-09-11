@@ -10,6 +10,26 @@ bursting out with rarity-scaled glow and confetti.
 > locks the real item + rarity, and the animation only controls *how* it's
 > revealed. The animation is the exciting part — the drop is 100% the real one.
 
+## Commands & keybind
+
+- **`/treegifts`** (alias **`/tg`**) — replay your last real drop.
+- **`/tg demo [rarity]`** — preview a reveal at any rarity (`common`…`special`).
+- **`/tg stats`** / **`/tg reset`** — lifetime stats (per-rarity counts, best pull,
+  rarest find) and clear them.
+- **`/tg auto`** — toggle auto-reveal on a real Tree Gift.
+- **`/tg threshold <rarity>`** — only auto-reveal that rarity **and above** (great
+  for grinding: set `epic` so only exciting drops interrupt you).
+- **`/tg sound`** — toggle the reveal sounds.
+- **Key `G`** — replay the last drop (rebindable under Controls → Tree Gifts).
+
+## Config
+
+Settings + lifetime stats persist in `config/treegifts.properties`:
+`autoReveal`, `minRarity` (0 Common … 6 Special), `playSounds`,
+`particleScale` (0–2), `animationSpeed` (0.5–2). Higher rarities automatically get
+a bigger reveal — more glow, particles and confetti, and a screen flash on
+Legendary+.
+
 ## How it works (the pipeline)
 
 ```
